@@ -1,5 +1,6 @@
 ﻿using ChessChallenge.API;
 using System;
+using System.Collections.Generic;
 
 public class MyBot : IChessBot
 {
@@ -69,17 +70,16 @@ public class MyBot : IChessBot
     // Piece values: null, pawn, knight, bishop, rook, queen, king
     int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
 
-    Move move;
+    Move choice, current;
     Board board;
     Timer timer;
 
     int MAX = 10000000;
 
     /* TODO
-        - If time for this turn exceeds some amount, end searching.
         - Transposition tables
         - Implement Queisce search into search func to save tokens.
-        - Take advantage of 5 second init for constructor (populate tranposition tables).
+        - Take advantage of 5 second init for constructor (populate tranposition tables)?
     */
 
     public Move Think(Board board, Timer timer)
@@ -87,19 +87,24 @@ public class MyBot : IChessBot
         this.board = board;
         this.timer = timer;
 
+        choice = Move.NullMove;
+
         for (int depth = 1; depth < 100; depth++) {
-            
-            move = Move.NullMove;
 
+            current = Move.NullMove;
             int score = Search(depth, 0, -MAX, MAX);
-            Debug(0, "Depth: " + depth.ToString());
-            Debug(0, "Score: " + score.ToString());
-            Debug(0, "Move: " + move.ToString());
-            Debug(0, "Time: " + timer.MillisecondsElapsedThisTurn.ToString());
+            if (current != Move.NullMove) choice = current;
 
-            if (timer.MillisecondsElapsedThisTurn > 150) {
+            //Debug(0, "Depth: " + depth.ToString());
+            //Debug(0, "Score: " + score.ToString());
+            //Debug(0, "Move: " + move.ToString());
+            //Debug(0, "Time: " + timer.MillisecondsElapsedThisTurn.ToString());
+
+            if (timer.MillisecondsElapsedThisTurn > 500) {
+                Debug(0, "Max depth: " + depth.ToString());
                 break;
             }
+
         }
 
         //Debug(0, "MBOT Time took: " + timer.MillisecondsElapsedThisTurn.ToString());
@@ -108,35 +113,41 @@ public class MyBot : IChessBot
 
         //System.Threading.Thread.Sleep(1000);
 
-        return move;
+        return choice;
     }
 
     int Search(int depth, int ply, int alpha, int beta) {
-        if (depth <= 0) return Score();
+        if (depth <= 0) return Quiesce(alpha, beta);
         if (board.IsDraw()) return 0;
 
         Move[] moves = board.GetLegalMoves();
-        if (moves.Length == 0 && board.IsInCheck()) return -MAX;
+        if (moves.Length == 0 && board.IsInCheck()) return -MAX + ply;
 
-        //int best = -MAX;
-        foreach (Move next in moves) {
+        foreach (Move next in OrderMoves(ref moves)) {
             board.MakeMove(next);
             int score = -Search(depth - 1, ply + 1, -beta, -alpha);
             board.UndoMove(next);
 
-            //Debug(ply, "Move " + next.ToString());
-            //Debug(ply, "score: " + score);
-            //Debug(ply, "alpha: " + alpha);
-            //Debug(ply, "beta : " + beta);
+            if (timer.MillisecondsElapsedThisTurn > 500) {
+                return -MAX;
+            }
 
+            /*
+            if (ply == 0) {
+                Debug(ply, "Move " + next.ToString());
+                Debug(ply, "score: " + score);
+                Debug(ply, "alpha: " + alpha);
+                Debug(ply, "beta : " + beta);
+            }
+            */
+
+            if (score >= beta) return beta;
             if (score > alpha) {
-                if (ply == 0) move = next;
-                if (score >= beta) return beta;
                 alpha = score;
+                if (ply == 0) current = next;
             }
         }
 
-        //return best;
         return alpha;
     }
 
@@ -155,6 +166,18 @@ public class MyBot : IChessBot
         }
 
         return alpha;
+    }
+
+    ref Move[] OrderMoves(ref Move[] moves) {
+        Array.Sort(
+            Array.ConvertAll(moves, move => {
+                int value = 10 * (pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType]);
+                if (move.IsPromotion) value += pieceValues[(int)move.PromotionPieceType];
+                return -value; // Want the best options to come first, so they should have the smallest values.
+            }), 
+            moves
+        );
+        return ref moves;
     }
 
     int Score() {

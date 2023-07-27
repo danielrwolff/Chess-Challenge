@@ -1,13 +1,13 @@
-﻿using ChessChallenge.API;
+using ChessChallenge.API;
 using System;
 
 namespace ChessChallenge.Example
 {
     // A simple bot that can spot mate in one, and always captures the most valuable piece it can.
     // Plays randomly otherwise.
-    public class EvilBot : IChessBot
+    public class EvilBotV3 : IChessBot
     {
-        // EvilBot V4 (Move ordering)
+        // EvilBot V3 (Quiescent search, iterative deepening with timeout)
         ulong[,] tables = {
             {
                 4629771061636907072,
@@ -80,12 +80,6 @@ namespace ChessChallenge.Example
 
         int MAX = 10000000;
 
-        /* TODO
-            - Transposition tables
-            - Implement Queisce search into search func to save tokens.
-            - Take advantage of 5 second init for constructor (populate tranposition tables)?
-        */
-
         public Move Think(Board board, Timer timer)
         {
             this.board = board;
@@ -99,23 +93,10 @@ namespace ChessChallenge.Example
                 int score = Search(depth, 0, -MAX, MAX);
                 if (current != Move.NullMove) choice = current;
 
-                //Debug(0, "Depth: " + depth.ToString());
-                //Debug(0, "Score: " + score.ToString());
-                //Debug(0, "Move: " + move.ToString());
-                //Debug(0, "Time: " + timer.MillisecondsElapsedThisTurn.ToString());
-
                 if (timer.MillisecondsElapsedThisTurn > 500) {
-                    Debug(0, "Max depth: " + depth.ToString());
                     break;
                 }
-
             }
-
-            //Debug(0, "MBOT Time took: " + timer.MillisecondsElapsedThisTurn.ToString());
-            //Debug(0, "MBOT Score: " + score.ToString());
-            //Debug(0, "MBOT move: " + move.ToString());
-
-            //System.Threading.Thread.Sleep(1000);
 
             return choice;
         }
@@ -127,32 +108,24 @@ namespace ChessChallenge.Example
             Move[] moves = board.GetLegalMoves();
             if (moves.Length == 0 && board.IsInCheck()) return -MAX + ply;
 
-            foreach (Move next in OrderMoves(ref moves)) {
+            int score = -MAX;
+            foreach (Move next in moves) {
                 board.MakeMove(next);
-                int score = -Search(depth - 1, ply + 1, -beta, -alpha);
+                score = Math.Max(score, -Search(depth - 1, ply + 1, -beta, -alpha));
                 board.UndoMove(next);
 
                 if (timer.MillisecondsElapsedThisTurn > 500) {
                     return -MAX;
                 }
 
-                /*
-                if (ply == 0) {
-                    Debug(ply, "Move " + next.ToString());
-                    Debug(ply, "score: " + score);
-                    Debug(ply, "alpha: " + alpha);
-                    Debug(ply, "beta : " + beta);
-                }
-                */
-
-                if (score >= beta) return beta;
                 if (score > alpha) {
                     alpha = score;
                     if (ply == 0) current = next;
+                    if (alpha >= beta) break;
                 }
             }
 
-            return alpha;
+            return score;
         }
 
         int Quiesce(int alpha, int beta) {
@@ -170,18 +143,6 @@ namespace ChessChallenge.Example
             }
 
             return alpha;
-        }
-
-        ref Move[] OrderMoves(ref Move[] moves) {
-            Array.Sort(
-                Array.ConvertAll(moves, move => {
-                    int value = 10 * (pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType]);
-                    if (move.IsPromotion) value += pieceValues[(int)move.PromotionPieceType];
-                    return -value; // Want the best options to come first, so they should have the smallest values.
-                }), 
-                moves
-            );
-            return ref moves;
         }
 
         int Score() {
