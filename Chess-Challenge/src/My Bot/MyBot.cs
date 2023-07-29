@@ -1,6 +1,5 @@
 ﻿using ChessChallenge.API;
 using System;
-using System.Collections.Generic;
 
 public class MyBot : IChessBot
 {
@@ -70,7 +69,8 @@ public class MyBot : IChessBot
     // Piece values: null, pawn, knight, bishop, rook, queen, king
     int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
 
-    Move choice, current;
+    Move choiceMove, currentMove;
+    int choiceScore, currentScore;
     Board board;
     Timer timer;
 
@@ -87,33 +87,38 @@ public class MyBot : IChessBot
         this.board = board;
         this.timer = timer;
 
-        choice = Move.NullMove;
+        choiceMove = Move.NullMove;
 
-        for (int depth = 1; depth < 100; depth++) {
+        for (int depth = 1; depth < 99; depth++) {
 
-            current = Move.NullMove;
-            int score = Search(depth, 0, -MAX, MAX);
-            if (current != Move.NullMove) choice = current;
+            currentMove = Move.NullMove;
+            Search(depth, 0, -MAX, MAX);
 
-            //Debug(0, "Depth: " + depth.ToString());
+            //Debug(0, "============ Depth: " + depth.ToString());
             //Debug(0, "Score: " + score.ToString());
             //Debug(0, "Move: " + move.ToString());
             //Debug(0, "Time: " + timer.MillisecondsElapsedThisTurn.ToString());
 
             if (timer.MillisecondsElapsedThisTurn > 500) {
-                Debug(0, "Max depth: " + depth.ToString());
+                //Debug(0, "Max depth: " + depth.ToString());
                 break;
             }
-
+            if (currentMove != Move.NullMove) {
+                choiceMove = currentMove;
+                choiceScore = currentScore;
+            }
         }
 
-        //Debug(0, "MBOT Time took: " + timer.MillisecondsElapsedThisTurn.ToString());
-        //Debug(0, "MBOT Score: " + score.ToString());
-        //Debug(0, "MBOT move: " + move.ToString());
+        Debug(0, "POSITION: " + board.GetFenString());
+        Debug(0, "MBOT player: " + (board.IsWhiteToMove ? "White" : "Black"));
+        Debug(0, "MBOT time took: " + timer.MillisecondsElapsedThisTurn.ToString());
+        Debug(0, "MBOT move: " + choiceMove.ToString());
+        Debug(0, "MBOT score: " + choiceScore.ToString());
 
         //System.Threading.Thread.Sleep(1000);
 
-        return choice;
+        //Debug(0, "PLAYING: " + choice.ToString());
+        return choiceMove;
     }
 
     int Search(int depth, int ply, int alpha, int beta) {
@@ -123,9 +128,11 @@ public class MyBot : IChessBot
         Move[] moves = board.GetLegalMoves();
         if (moves.Length == 0 && board.IsInCheck()) return -MAX + ply;
 
+        int best = -MAX + 1;
         foreach (Move next in OrderMoves(ref moves)) {
             board.MakeMove(next);
-            int score = -Search(depth - 1, ply + 1, -beta, -alpha);
+            int extension = (ply < 16 && board.IsInCheck()) ? 1 : 0;
+            int score = -Search(depth - 1 + extension, ply + 1, -beta, -alpha);
             board.UndoMove(next);
 
             if (timer.MillisecondsElapsedThisTurn > 500) {
@@ -134,21 +141,30 @@ public class MyBot : IChessBot
 
             /*
             if (ply == 0) {
-                Debug(ply, "Move " + next.ToString());
+                Debug(0, "--");
+                Debug(ply, next.ToString());
                 Debug(ply, "score: " + score);
                 Debug(ply, "alpha: " + alpha);
                 Debug(ply, "beta : " + beta);
-            }
+                Debug(ply, "Current : " + current.ToString());
+                Debug(ply, "Choice : " + choice.ToString());
+            }  
             */
+            
 
-            if (score >= beta) return beta;
-            if (score > alpha) {
-                alpha = score;
-                if (ply == 0) current = next;
+            if (score > best) {
+                best = score;
+                alpha = Math.Max(alpha, best);
+                if (ply == 0) {
+                    currentMove = next;
+                    currentScore = best;
+                    //Debug(0, "A=" + alpha + " B=" + beta + "; found score = " + best + "; updating current: " + current.ToString());
+                }
+                if (alpha >= beta) break;
             }
         }
 
-        return alpha;
+        return best;
     }
 
     int Quiesce(int alpha, int beta) {
@@ -156,22 +172,26 @@ public class MyBot : IChessBot
         if (pat >= beta) return beta;
         if (alpha < pat) alpha = pat;
 
+        int best = pat;
         foreach(Move next in board.GetLegalMoves(true)) {
             board.MakeMove(next);
             int score = -Quiesce(-beta, -alpha);
             board.UndoMove(next);
 
-            if (score >= beta) return beta;
-            alpha = Math.Max(alpha, score);
+            if (score > best) {
+                best = score;
+                alpha = Math.Max(alpha, best);
+                if (alpha >= beta) break;
+            }
         }
 
-        return alpha;
+        return best;
     }
 
     ref Move[] OrderMoves(ref Move[] moves) {
         Array.Sort(
             Array.ConvertAll(moves, move => {
-                int value = 10 * (pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType]);
+                int value = 10 * pieceValues[(int)move.CapturePieceType] - pieceValues[(int)move.MovePieceType];
                 if (move.IsPromotion) value += pieceValues[(int)move.PromotionPieceType];
                 return -value; // Want the best options to come first, so they should have the smallest values.
             }), 

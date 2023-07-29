@@ -91,7 +91,7 @@ namespace ChessChallenge.Example
         int Search(Board board, int alpha, int beta, int depth) {
             if (depth == 0) return -Score(board);
 
-            int best = -2147483647;
+            int best = -2147483647 + 1;
             foreach (Move next in board.GetLegalMoves()) {
                 board.MakeMove(next);
                 int eval = -Search(board, alpha, beta, depth - 1);

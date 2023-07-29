@@ -1,8 +1,8 @@
-﻿using ChessChallenge.API;
+using ChessChallenge.API;
 using System;
 using System.Collections.Generic;
 
-public class EvilBot : IChessBot
+public class EvilBotV5 : IChessBot
 {
     ulong[,] tables = {
         {
