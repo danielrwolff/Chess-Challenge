@@ -1,7 +1,7 @@
-﻿using ChessChallenge.API;
+using ChessChallenge.API;
 using System;
 
-public class MyBot : IChessBot
+public class EvilBotV7 : IChessBot
 {
     ulong[,] mg_pesto_values = {
         {
@@ -142,7 +142,7 @@ public class MyBot : IChessBot
 
     int MAX = 10000000;
 
-    public MyBot() {
+    public EvilBotV7() {
         Array.Resize(ref tt, 0x8FFFFF);
     }
 
@@ -161,10 +161,6 @@ public class MyBot : IChessBot
             
             Search(depth, 0, -MAX, MAX);
 
-            //Debug(0, "Score: " + score.ToString());
-            //Debug(0, "Move: " + move.ToString());
-            //Debug(0, "Time: " + timer.MillisecondsElapsedThisTurn.ToString());
-
             if (timer.MillisecondsElapsedThisTurn > 500) {
                 if (currentScore > choiceScore) {
                     choiceMove = currentMove;
@@ -179,15 +175,6 @@ public class MyBot : IChessBot
             }
         }
 
-        Debug(0, "POSITION: " + board.GetFenString());
-        Debug(0, "MBOT time took: " + timer.MillisecondsElapsedThisTurn.ToString());
-        Debug(0, "MBOT move: " + choiceMove.ToString());
-        Debug(0, "MBOT score: " + choiceScore.ToString());
-        Debug(0, "MBOT depth: " + depth.ToString());
-
-        //System.Threading.Thread.Sleep(1000);
-
-        //Debug(0, "PLAYING: " + choice.ToString());
         return choiceMove;
     }
 
@@ -243,7 +230,6 @@ public class MyBot : IChessBot
                 if (ply == 0 && score > currentScore) {
                     currentMove = next;
                     currentScore = score;
-                    //Debug(0, "A=" + alpha + " B=" + beta + "; found score = " + score + "; updating current: " + currentMove.ToString());
                 }
             }
         }
