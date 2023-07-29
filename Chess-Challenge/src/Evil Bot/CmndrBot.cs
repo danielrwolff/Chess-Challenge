@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 
-public class BossBot : IChessBot
+public class CmndrBot : IChessBot
 {
     // Define globals to save tokens
     int CHECKMATE = 100000;
