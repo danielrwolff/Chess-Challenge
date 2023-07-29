@@ -1,7 +1,7 @@
-﻿using ChessChallenge.API;
+using ChessChallenge.API;
 using System;
 
-public class MyBot : IChessBot
+public class EvilBotV6 : IChessBot
 {
     ulong[,] mg_pesto_values = {
         {
