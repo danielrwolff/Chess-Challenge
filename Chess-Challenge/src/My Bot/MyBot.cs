@@ -1,4 +1,6 @@
-﻿using ChessChallenge.API;
+﻿#define DEBUG
+
+using ChessChallenge.API;
 using System;
 
 public class MyBot : IChessBot
@@ -134,7 +136,10 @@ public class MyBot : IChessBot
     int[] phase_incs = { 0, 0, 1, 1, 2, 4, 0 };
 
     Move choiceMove, currentMove;
-    int choiceScore, currentScore;
+    int choiceScore, currentScore, timeout;
+#if DEBUG
+    int nodes;
+#endif
     Board board;
     Timer timer;
 
@@ -143,7 +148,7 @@ public class MyBot : IChessBot
     int MAX = 10000000;
 
     public MyBot() {
-        Array.Resize(ref tt, 0x8FFFFF);
+        Array.Resize(ref tt, 0x8FFFFF + 1);
     }
 
     public Move Think(Board board, Timer timer)
@@ -152,20 +157,29 @@ public class MyBot : IChessBot
         this.timer = timer;
 
         choiceMove = Move.NullMove;
-        int depth = 1;
+        timeout = timer.MillisecondsRemaining / (board.PlyCount < 10 ? 1000 : 125); 
 
-        for (; depth < 30; depth++) {
+        for (int depth = 1; depth < 30; depth++) {
 
             currentMove = Move.NullMove;
             currentScore = -MAX;
-            
+#if DEBUG
+            nodes = 0;
+#endif
+
             Search(depth, 0, -MAX, MAX);
 
-            //Debug(0, "Score: " + score.ToString());
-            //Debug(0, "Move: " + move.ToString());
-            //Debug(0, "Time: " + timer.MillisecondsElapsedThisTurn.ToString());
+#if DEBUG
+            Debug(0, 
+                "MBOT depth=" + depth +
+                "; nodes=" + nodes +
+                "; score=" + currentScore +
+                "; time=" + timer.MillisecondsElapsedThisTurn +
+                "; move=" + currentMove
+            );
+#endif
 
-            if (timer.MillisecondsElapsedThisTurn > 500) {
+            if (timer.MillisecondsElapsedThisTurn > timeout) {
                 if (currentScore > choiceScore) {
                     choiceMove = currentMove;
                     choiceScore = currentScore;
@@ -179,19 +193,30 @@ public class MyBot : IChessBot
             }
         }
 
+#if DEBUG
+        /*
         Debug(0, "POSITION: " + board.GetFenString());
         Debug(0, "MBOT time took: " + timer.MillisecondsElapsedThisTurn.ToString());
         Debug(0, "MBOT move: " + choiceMove.ToString());
         Debug(0, "MBOT score: " + choiceScore.ToString());
         Debug(0, "MBOT depth: " + depth.ToString());
+        */
 
         //System.Threading.Thread.Sleep(1000);
 
         //Debug(0, "PLAYING: " + choice.ToString());
+        Debug(0, "MBOT committing " + choiceMove + " with a score of " + choiceScore);
+        if (choiceMove == Move.NullMove) throw new Exception("null move");
+#endif
+
         return choiceMove;
     }
 
     int Search(int depth, int ply, int alpha, int beta) {
+#if DEBUG
+        nodes++;
+#endif
+
         if (board.IsDraw()) return 0;
 
         bool queisce = depth < 0;
@@ -214,7 +239,7 @@ public class MyBot : IChessBot
         if (queisce) {
             int pat = Score();
             if (pat >= beta) return beta;
-            if (alpha < pat) alpha = pat;
+            alpha = Math.Max(alpha, pat);
         }
 
         int result = alpha;
@@ -228,7 +253,7 @@ public class MyBot : IChessBot
             int score = -Search(depth - 1 + extension, ply + 1, -beta, -alpha);
             board.UndoMove(next);
 
-            if (timer.MillisecondsElapsedThisTurn > 500) {
+            if (timer.MillisecondsElapsedThisTurn > timeout) {
                 return -MAX;
             }
 
@@ -305,8 +330,10 @@ public class MyBot : IChessBot
         return (int)(mgScore * phase + egScore * (24 - phase)) / 24;
     }
 
+#if DEBUG
     void Debug(int depth, string text) {
         System.Console.WriteLine(String.Concat(new string('\t', depth), text));
     }
+#endif
 
 }
