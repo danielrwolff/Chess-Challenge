@@ -238,7 +238,21 @@ public class MyBot : IChessBot
         Move[] moves = board.GetLegalMoves(queisce);
         if (!queisce && moves.Length == 0) return board.IsInCheck() ? -MAX + ply : 0;
 
-        foreach (Move move in OrderMoves(ref moves, bestMove)) {
+        Array.Sort(
+            Array.ConvertAll(moves, move => {
+                if (move == bestMove) return -MAX;
+                int after = GetPieceValue(move.MovePieceType, move.TargetSquare, board.IsWhiteToMove);
+                int before = GetPieceValue(move.MovePieceType, move.StartSquare, board.IsWhiteToMove);
+                return -(
+                    after - before
+                    + (move.IsCapture ? 100 * GetPieceValue(move.CapturePieceType, move.TargetSquare, !board.IsWhiteToMove) - before : 0)
+                    + (move.IsPromotion ? 5 * GetPieceValue(move.PromotionPieceType, move.TargetSquare, board.IsWhiteToMove) : 0)
+                );
+            }), 
+            moves
+        );
+
+        foreach (Move move in moves) {
             board.MakeMove(move);
             int score = -Search(depth - 1, ply + 1, -beta, -alpha);
             board.UndoMove(move);
@@ -279,23 +293,6 @@ public class MyBot : IChessBot
         }
 
         return result;
-    }
-
-    ref Move[] OrderMoves(ref Move[] moves, Move priority) {
-        Array.Sort(
-            Array.ConvertAll(moves, move => {
-                if (move == priority) return -MAX;
-                int after = GetPieceValue(move.MovePieceType, move.TargetSquare, board.IsWhiteToMove);
-                int before = GetPieceValue(move.MovePieceType, move.StartSquare, board.IsWhiteToMove);
-                return -(
-                    after - before
-                    + (move.IsCapture ? 100 * GetPieceValue(move.CapturePieceType, move.TargetSquare, !board.IsWhiteToMove) - before : 0)
-                    + (move.IsPromotion ? 5 * GetPieceValue(move.PromotionPieceType, move.TargetSquare, board.IsWhiteToMove) : 0)
-                );
-            }), 
-            moves
-        );
-        return ref moves;
     }
 
     int Score() {
