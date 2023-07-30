@@ -129,7 +129,7 @@ MIN = min(all_values)
 MAX = max(all_values)
 
 def normalize(values) :
-  return [int((v-MIN) / float(MAX-MIN) * 255) - 127 for v in values]
+  return [v//2 for v in values]
 
 def encode(table):
   result = []
