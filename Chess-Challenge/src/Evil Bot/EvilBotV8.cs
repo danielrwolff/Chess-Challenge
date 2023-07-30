@@ -1,9 +1,9 @@
-﻿//#define DEBUG
+//#define DEBUG
 
 using ChessChallenge.API;
 using System;
 
-public class MyBot : IChessBot
+public class EvilBotV8 : IChessBot
 {
     ulong[,] mg_pesto_values = {
         {
@@ -148,7 +148,7 @@ public class MyBot : IChessBot
 
     int MAX = 10000000;
 
-    public MyBot() {
+    public EvilBotV8() {
         Array.Resize(ref tt, 0x7FFFFF + 1);
     }
 

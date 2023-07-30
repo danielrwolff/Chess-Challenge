@@ -133,8 +133,9 @@ public class EvilBot : IChessBot
     ulong[] eg_piece_value = { 0, 94, 281, 297, 512, 936, 0 };
     int[] phase_incs = { 0, 0, 1, 1, 2, 4, 0 };
 
-    Move choiceMove, currentMove;
-    int choiceScore, currentScore;
+    Move choice;
+    int timeout;
+
     Board board;
     Timer timer;
 
@@ -143,7 +144,7 @@ public class EvilBot : IChessBot
     int MAX = 10000000;
 
     public EvilBot() {
-        Array.Resize(ref tt, 0x8FFFFF);
+        Array.Resize(ref tt, 0x7FFFFF + 1);
     }
 
     public Move Think(Board board, Timer timer)
@@ -151,96 +152,78 @@ public class EvilBot : IChessBot
         this.board = board;
         this.timer = timer;
 
-        choiceMove = Move.NullMove;
-        int depth = 1;
+        timeout = timer.MillisecondsRemaining / 100;
+        choice = Move.NullMove;
 
-        for (; depth < 30; depth++) {
+        for (int depth = 1; depth < 30; depth++) {
 
-            currentMove = Move.NullMove;
-            currentScore = -MAX;
-            
             Search(depth, 0, -MAX, MAX);
 
-            if (timer.MillisecondsElapsedThisTurn > 500) {
-                if (currentScore > choiceScore) {
-                    choiceMove = currentMove;
-                    choiceScore = currentScore;
-                }
+            if (timer.MillisecondsElapsedThisTurn > timeout) {
                 break;
-            }
-            
-            if (currentMove != Move.NullMove) {
-                choiceMove = currentMove;
-                choiceScore = currentScore;
             }
         }
 
-        return choiceMove;
+        return choice;
     }
 
     int Search(int depth, int ply, int alpha, int beta) {
-        if (board.IsDraw()) return 0;
+        if (board.IsInsufficientMaterial() || board.IsRepeatedPosition() || board.FiftyMoveCounter >= 100)
+            return 0;
 
-        bool queisce = depth < 0;
+        bool queisce = depth <= 0;
         ulong key = board.ZobristKey;
+        int oAlpha = alpha, result = -MAX;
 
-        var ttEntry = tt[key % 0x8FFFFF];
-        if (   ttEntry.key == key
-            && ttEntry.depth >= depth
-            && (
-                ttEntry.flag == 0
-                || (ttEntry.flag == 1 && ttEntry.score <= alpha)
-                || (ttEntry.flag == 2 && ttEntry.score >= beta) 
-            )
-        ) {
-            return ttEntry.score;
+        var ttEntry = tt[key % 0x7FFFFF];
+        if (ply > 0 && ttEntry.key == key && ttEntry.depth >= depth) {
+            if (ttEntry.flag == 0) return ttEntry.score;
+            if (ttEntry.flag == 1) alpha = Math.Max(alpha, ttEntry.score);
+            if (ttEntry.flag == 2) beta = Math.Min(beta, ttEntry.score);
+            if (alpha >= beta) return ttEntry.score; 
         }
 
         Move bestMove = ttEntry.move;
 
         if (queisce) {
-            int pat = Score();
-            if (pat >= beta) return beta;
-            if (alpha < pat) alpha = pat;
+            result = Score();
+            if (result >= beta) return result;
+            alpha = Math.Max(alpha, result);
         }
 
-        int result = alpha;
-
         Move[] moves = board.GetLegalMoves(queisce);
-        if (!queisce && moves.Length == 0 && board.IsInCheck()) return -MAX + ply;
+        if (!queisce && moves.Length == 0) return board.IsInCheck() ? -MAX + ply : 0;
 
-        foreach (Move next in OrderMoves(ref moves, bestMove)) {
-            board.MakeMove(next);
-            int extension = (ply < 16 && board.IsInCheck()) ? 1 : 0;
-            int score = -Search(depth - 1 + extension, ply + 1, -beta, -alpha);
-            board.UndoMove(next);
+        foreach (Move move in OrderMoves(ref moves, bestMove)) {
+            board.MakeMove(move);
+            int score = -Search(depth - 1, ply + 1, -beta, -alpha);
+            board.UndoMove(move);
 
-            if (timer.MillisecondsElapsedThisTurn > 500) {
+            if (timer.MillisecondsElapsedThisTurn > timeout) {
                 return -MAX;
             }
 
-            if (score >= beta) {
-                result = beta;
-                break;
-            }
-            if (score > alpha) {
-                alpha = score;
+            if (score > result) {
                 result = score;
-                bestMove = next;
-                if (ply == 0 && score > currentScore) {
-                    currentMove = next;
-                    currentScore = score;
+                bestMove = move;
+                if (ply == 0) {
+                    choice = move;
                 }
             }
+
+            alpha = Math.Max(alpha, score);
+            if (alpha >= beta) break;
         }
 
-        tt[key % 0x8FFFFF] = (
-            bestMove,
-            key,
-            depth,
-            result >= beta ? 2 : result > alpha ? 0 : 1,
-            result
-        );
+        if (bestMove != Move.NullMove) {
+            tt[key % 0x7FFFFF] = (
+                bestMove,
+                key,
+                depth,
+                result <= oAlpha ? 2 : result >= beta ? 1 : 0,
+                result
+            );
+        }
 
         return result;
     }
@@ -253,7 +236,7 @@ public class EvilBot : IChessBot
                 int before = GetPieceValue(move.MovePieceType, move.StartSquare, board.IsWhiteToMove);
                 return -(
                     after - before
-                    + (move.IsCapture ? 10 * (GetPieceValue(move.CapturePieceType, move.TargetSquare, !board.IsWhiteToMove) - before) : 0)
+                    + (move.IsCapture ? 100 * GetPieceValue(move.CapturePieceType, move.TargetSquare, !board.IsWhiteToMove) - before : 0)
                     + (move.IsPromotion ? 5 * GetPieceValue(move.PromotionPieceType, move.TargetSquare, board.IsWhiteToMove) : 0)
                 );
             }), 
@@ -290,9 +273,4 @@ public class EvilBot : IChessBot
         ulong egScore = ((egRank >> (square.File * 8)) & 255) - 127 + eg_piece_value[type_index];
         return (int)(mgScore * phase + egScore * (24 - phase)) / 24;
     }
-
-    void Debug(int depth, string text) {
-        System.Console.WriteLine(String.Concat(new string('\t', depth), text));
-    }
-
 }
