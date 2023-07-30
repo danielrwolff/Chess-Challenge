@@ -21,7 +21,9 @@ namespace ChessChallenge.Application
             MyBot,
             EvilBot,
             AugsBot,
-            CmndrBot
+            CmndrBot,
+            Tier1,
+            Tier2
         }
 
         // Game state
@@ -214,6 +216,8 @@ namespace ChessChallenge.Application
                 PlayerType.EvilBot => new ChessPlayer(new EvilBot(), type, GameDurationMilliseconds),
                 PlayerType.AugsBot => new ChessPlayer(new AugsBot(), type, GameDurationMilliseconds),
                 PlayerType.CmndrBot => new ChessPlayer(new CmndrBot(), type, GameDurationMilliseconds),
+                PlayerType.Tier1 => new ChessPlayer(new Tier1(), type, GameDurationMilliseconds),
+                PlayerType.Tier2 => new ChessPlayer(new Tier2(), type, GameDurationMilliseconds),
                 _ => new ChessPlayer(new HumanPlayer(boardUI), type)
             };
         }
