@@ -1,7 +1,7 @@
-﻿using ChessChallenge.API;
+using ChessChallenge.API;
 using System;
 
-public class MyBot : IChessBot
+public class EvilBotV9 : IChessBot
 {
     ulong[,] mg_pesto_values = {
         {
@@ -146,7 +146,7 @@ public class MyBot : IChessBot
 
     int MAX = 10000000;
 
-    public MyBot() {
+    public EvilBotV9() {
         Array.Resize(ref tt, 0x7FFFFF + 1);
     }
 
@@ -171,6 +171,7 @@ public class MyBot : IChessBot
             Search(depth, 0, -MAX, MAX);
 
 #if DEBUG
+            /*
             Debug(0, 
                 "MBOT depth=" + depth +
                 "; nodes=" + nodes +
@@ -178,6 +179,7 @@ public class MyBot : IChessBot
                 "; time=" + timer.MillisecondsElapsedThisTurn +
                 "; move=" + choice
             );
+            */
 #endif
 
             if (timer.MillisecondsElapsedThisTurn > timeout) {
@@ -186,9 +188,7 @@ public class MyBot : IChessBot
         }
 
 #if DEBUG
-        //System.Threading.Thread.Sleep(1000);
-
-        Debug(0, "MBOT committing " + choice + " with a score of " + choiceScore);
+        //Debug(0, "MBOT committing " + choice + " with a score of " + choiceScore);
         if (choice == Move.NullMove) throw new Exception("null move");
 #endif
 
