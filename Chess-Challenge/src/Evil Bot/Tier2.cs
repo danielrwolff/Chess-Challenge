@@ -4,6 +4,7 @@ using System;
 public class Tier2 : IChessBot
 {
     Move bestmoveRoot = Move.NullMove;
+    int bestmoveScore;
 
     // https://www.chessprogramming.org/PeSTO%27s_Evaluation_Function
     int[] pieceVal = {0, 100, 310, 330, 500, 1000, 10000 };
@@ -114,7 +115,10 @@ public class Tier2 : IChessBot
             if(score > best) {
                 best = score;
                 bestMove = move;
-                if(ply == 0) bestmoveRoot = move;
+                if(ply == 0) {
+                    bestmoveRoot = move;
+                    bestmoveScore = best;
+                }
 
                 // Improve alpha
                 alpha = Math.Max(alpha, score);
@@ -140,14 +144,27 @@ public class Tier2 : IChessBot
     public Move Think(Board board, Timer timer)
     {
         bestmoveRoot = Move.NullMove;
+        bestmoveScore = -30000;
+
         // https://www.chessprogramming.org/Iterative_Deepening
         for(int depth = 1; depth <= 50; depth++) {
             int score = Search(board, timer, -30000, 30000, depth, 0);
+
+            System.Console.WriteLine(
+                "T2 depth=" + depth +
+                "; score=" + bestmoveScore +
+                "; time=" + timer.MillisecondsElapsedThisTurn +
+                "; move=" + bestmoveRoot
+            );
 
             // Out of time
             if(timer.MillisecondsElapsedThisTurn >= timer.MillisecondsRemaining / 30)
                 break;
         }
-        return bestmoveRoot.IsNull ? board.GetLegalMoves()[0] : bestmoveRoot;
+
+        if (bestmoveRoot.IsNull) bestmoveRoot = board.GetLegalMoves()[0];
+        
+        System.Console.WriteLine("T2 committing " + bestmoveRoot + " with a score of " + bestmoveScore);
+        return bestmoveRoot;
     }
 }
