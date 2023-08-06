@@ -155,8 +155,8 @@ public class MyBot : IChessBot
         this.board = board;
         this.timer = timer;
 
-        timeout = timer.MillisecondsRemaining / 100; //(board.PlyCount < 10 ? 1000 : 125);
         choice = Move.NullMove;
+        timeout = timer.MillisecondsRemaining / 100;
 
 #if DEBUG
         choiceScore = -MAX;
@@ -186,8 +186,6 @@ public class MyBot : IChessBot
         }
 
 #if DEBUG
-        //System.Threading.Thread.Sleep(1000);
-
         Debug(0, "MBOT committing " + choice + " with a score of " + choiceScore);
         if (choice == Move.NullMove) throw new Exception("null move");
 #endif
@@ -226,27 +224,29 @@ public class MyBot : IChessBot
         Move[] moves = board.GetLegalMoves(queisce);
         if (!queisce && moves.Length == 0) return board.IsInCheck() ? -MAX + ply : 0;
 
-        Array.Sort(
-            Array.ConvertAll(moves, move => {
-                if (move == bestMove) return -MAX;
-                return -(
-                    (move.IsCapture ? 100 * (int)move.CapturePieceType - (int)move.MovePieceType : 0) +
-                    (move.IsPromotion ? 5 * (int)move.PromotionPieceType : 0)
-                );
-            }),
-            moves
-        );
+        int[] ordering = Array.ConvertAll(moves, move => {
+            if (move == bestMove) return MAX;
+            return
+                (move.IsCapture ? 100 * (int)move.CapturePieceType - (int)move.MovePieceType : 0) +
+                (move.IsPromotion ? 5 * (int)move.PromotionPieceType : 0);
+        });
+        
+        for (int index = 0, pick; index < moves.Length; index++) {
 
-        foreach (Move move in moves) {
+            pick = index;
+            for (int j = index; j < moves.Length; j++) {
+                if (ordering[j] > ordering[pick]) pick = j;
+            }
+            (ordering[index], ordering[pick], moves[index], moves[pick]) = (ordering[pick], ordering[index], moves[pick], moves[index]);
+            Move move = moves[index];
+            
             board.MakeMove(move);
             int score = -Search(depth - 1, ply + 1, -beta, -alpha);
             board.UndoMove(move);
 
-            /*
             if (timer.MillisecondsElapsedThisTurn > timeout) {
                 return -MAX;
             }
-            */
 
 #if DEBUG
             //Debug(ply, "received score for " + move.ToString() + " = " + score + "; best = " + result);
