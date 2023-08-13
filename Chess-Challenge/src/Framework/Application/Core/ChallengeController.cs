@@ -29,8 +29,6 @@ namespace ChessChallenge.Application
         int gameID;
         bool isPlaying;
         Board board;
-        int totalMovesPlayed = 0;
-        public int trueTotalMovesPlayed = 0;
 
         public ChessPlayer PlayerWhite { get; private set; }
         public ChessPlayer PlayerBlack {get;private set;}
@@ -116,8 +114,6 @@ namespace ChessChallenge.Application
             // Start
             isPlaying = true;
             NotifyTurnToMove();
-
-            trueTotalMovesPlayed += totalMovesPlayed;
         }
 
         void BotThinkerThread()
@@ -155,7 +151,6 @@ namespace ChessChallenge.Application
             {
                 API.Timer timer = new(PlayerToMove.TimeRemainingMs, PlayerNotOnMove.TimeRemainingMs, GameDurationMilliseconds, IncrementMilliseconds);
                 API.Move move = PlayerToMove.Bot.Think(botBoard, timer);
-                totalMovesPlayed++;
                 return new Move(move.RawValue);
             }
             catch (Exception e)
