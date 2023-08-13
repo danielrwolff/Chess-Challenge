@@ -20,8 +20,6 @@ namespace ChessChallenge.Application
             Human,
             MyBot,
             EvilBot,
-            AugsBot,
-            CmndrBot,
             Tier1,
             Tier2
         }
@@ -31,6 +29,9 @@ namespace ChessChallenge.Application
         int gameID;
         bool isPlaying;
         Board board;
+        int totalMovesPlayed = 0;
+        public int trueTotalMovesPlayed = 0;
+
         public ChessPlayer PlayerWhite { get; private set; }
         public ChessPlayer PlayerBlack {get;private set;}
 
@@ -115,6 +116,8 @@ namespace ChessChallenge.Application
             // Start
             isPlaying = true;
             NotifyTurnToMove();
+
+            trueTotalMovesPlayed += totalMovesPlayed;
         }
 
         void BotThinkerThread()
@@ -152,6 +155,7 @@ namespace ChessChallenge.Application
             {
                 API.Timer timer = new(PlayerToMove.TimeRemainingMs, PlayerNotOnMove.TimeRemainingMs, GameDurationMilliseconds, IncrementMilliseconds);
                 API.Move move = PlayerToMove.Bot.Think(botBoard, timer);
+                totalMovesPlayed++;
                 return new Move(move.RawValue);
             }
             catch (Exception e)
@@ -214,8 +218,6 @@ namespace ChessChallenge.Application
             {
                 PlayerType.MyBot => new ChessPlayer(new MyBot(), type, GameDurationMilliseconds),
                 PlayerType.EvilBot => new ChessPlayer(new EvilBot(), type, GameDurationMilliseconds),
-                PlayerType.AugsBot => new ChessPlayer(new AugsBot(), type, GameDurationMilliseconds),
-                PlayerType.CmndrBot => new ChessPlayer(new CmndrBot(), type, GameDurationMilliseconds),
                 PlayerType.Tier1 => new ChessPlayer(new Tier1(), type, GameDurationMilliseconds),
                 PlayerType.Tier2 => new ChessPlayer(new Tier2(), type, GameDurationMilliseconds),
                 _ => new ChessPlayer(new HumanPlayer(boardUI), type)
