@@ -1,7 +1,7 @@
-﻿using ChessChallenge.API;
+using ChessChallenge.API;
 using System;
 
-public class EvilBot : IChessBot
+public class EvilBotV10 : IChessBot
 {
     ulong[,] mg_pesto_values = {
         {
@@ -147,7 +147,7 @@ public class EvilBot : IChessBot
 
     int MAX = 10000000;
 
-    public EvilBot() {
+    public EvilBotV10() {
         Array.Resize(ref tt, 0x7FFFFF + 1);
     }
 

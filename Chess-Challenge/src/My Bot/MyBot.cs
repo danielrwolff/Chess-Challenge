@@ -143,6 +143,7 @@ public class MyBot : IChessBot
     Timer timer;
 
     (Move move, ulong key, int depth, int flag, int score)[] tt = {};
+    Move[,] killers;
 
     int MAX = 10000000;
 
@@ -154,42 +155,42 @@ public class MyBot : IChessBot
     {
         this.board = board;
         this.timer = timer;
+        killers = new Move[60,2];
 
         choice = Move.NullMove;
-        timeout = timer.MillisecondsRemaining / 100;
+        timeout = timer.MillisecondsRemaining / 30;
 
 #if DEBUG
         choiceScore = -MAX;
 #endif
 
-        for (int depth = 1; depth < 30; depth++) {
+        int depth = 1;
+        while (timer.MillisecondsElapsedThisTurn < timeout && depth <= 30) {
 
 #if DEBUG
             nodes = 0;
 #endif
 
-            Search(depth, 0, -MAX, MAX);
+            int score = Search(depth++, 0, -MAX, MAX);
+            if (score > MAX/2) break;
 
 #if DEBUG
             Debug(0, 
-                "MBOT depth=" + depth +
+                "MBOT depth=" + (depth-1) +
                 "; nodes=" + nodes +
                 "; score=" + choiceScore +
                 "; time=" + timer.MillisecondsElapsedThisTurn +
-                "; move=" + choice
+                "; " + choice
             );
 #endif
-
-            if (timer.MillisecondsElapsedThisTurn > timeout) {
-                break;
-            }
         }
 
 #if DEBUG
         Debug(0, "MBOT committing " + choice + " with a score of " + choiceScore);
-        if (choice == Move.NullMove) throw new Exception("null move");
 #endif
 
+        // Debug this issue
+        if (choice.IsNull) choice = board.GetLegalMoves()[0];
         return choice;
     }
 
@@ -198,20 +199,18 @@ public class MyBot : IChessBot
         nodes++;
 #endif
 
-        if (board.IsInsufficientMaterial() || board.IsRepeatedPosition() || board.FiftyMoveCounter >= 100)
-            return 0;
-
-        bool queisce = depth <= 0;
+        bool queisce = depth <= 0, isRoot = ply == 0;
         ulong key = board.ZobristKey;
-        int oAlpha = alpha, result = -MAX;
+        int oAlpha, result = -MAX;
+
+        if (!isRoot && board.IsRepeatedPosition()) return 0;
 
         var ttEntry = tt[key % 0x7FFFFF];
-        if (ply > 0 && ttEntry.key == key && ttEntry.depth >= depth) {
-            if (ttEntry.flag == 0 
+        if (!isRoot && ttEntry.key == key && ttEntry.depth >= depth && (
+                ttEntry.flag == 0 
                 || (ttEntry.flag == 1 && ttEntry.score <= alpha) 
                 || (ttEntry.flag == 2 && ttEntry.score >= beta)
-            ) return ttEntry.score;  
-        }
+            )) return ttEntry.score;
 
         Move bestMove = ttEntry.move;
 
@@ -221,17 +220,22 @@ public class MyBot : IChessBot
             alpha = Math.Max(alpha, result);
         }
 
-        Move[] moves = board.GetLegalMoves(queisce);
-        if (!queisce && moves.Length == 0) return board.IsInCheck() ? -MAX + ply : 0;
+        Move[] moves = board.GetLegalMoves(queisce && !board.IsInCheck());
+        if (!queisce && moves.Length == 0) return board.IsInCheck() ? -MAX + ply+1 : 0;
 
-        int[] ordering = Array.ConvertAll(moves, move => {
-            if (move == bestMove) return MAX;
-            return
-                (move.IsCapture ? 100 * (int)move.CapturePieceType - (int)move.MovePieceType : 0) +
-                (move.IsPromotion ? 5 * (int)move.PromotionPieceType : 0);
-        });
-        
+        int[] ordering = Array.ConvertAll(moves, move =>
+            (move == bestMove ? MAX : 0) +
+            (move.IsCapture 
+                ? 1000 * (int)move.CapturePieceType - (int)move.MovePieceType 
+                : (killers[ply, 0] == move || killers[ply, 1] == move ? 900 : 0))
+        );
+
+        oAlpha = alpha;
+
         for (int index = 0, pick; index < moves.Length; index++) {
+            if (timer.MillisecondsElapsedThisTurn > timeout) {
+                return MAX;
+            }
 
             pick = index;
             for (int j = index; j < moves.Length; j++) {
@@ -239,31 +243,45 @@ public class MyBot : IChessBot
             }
             (ordering[index], ordering[pick], moves[index], moves[pick]) = (ordering[pick], ordering[index], moves[pick], moves[index]);
             Move move = moves[index];
-            
+
             board.MakeMove(move);
-            int score = -Search(depth - 1, ply + 1, -beta, -alpha);
-            board.UndoMove(move);
-
-            if (timer.MillisecondsElapsedThisTurn > timeout) {
-                return -MAX;
+            int score;
+            if (index == 0) {
+                score = -Search(depth - 1, ply + 1, -beta, -alpha);
             }
-
-#if DEBUG
-            //Debug(ply, "received score for " + move.ToString() + " = " + score + "; best = " + result);
-#endif
+            else {
+                score = -Search(depth - 1, ply + 1, -alpha - 1, -alpha);
+                if (alpha < score && score < beta) 
+                    score = -Search(depth - 1, ply + 1, -beta, -score);
+            }
+            board.UndoMove(move);
 
             if (score > result) {
                 result = score;
                 bestMove = move;
-                if (ply == 0) {
+                if (isRoot) {
                     choice = move;
 #if DEBUG
                     choiceScore = result;
                     //Debug(0, "A=" + alpha + " B=" + beta + "; found score = " + score + "; updating current: " + choice.ToString());
 #endif
                 }
-                alpha = Math.Max(alpha, score);
-                if (alpha >= beta) break;
+
+                if (score > alpha) {
+                    alpha = score;
+                    if (!move.IsCapture) {
+                        // History heuristic
+                    }
+
+                }
+
+                if (score >= beta) {
+                    if (!move.IsCapture && killers[ply, 0] != move) {
+                        killers[ply, 1] = killers[ply, 0];
+                        killers[ply, 0] = move;
+                    }
+                    break;
+                }
             }
         }
 
@@ -276,7 +294,7 @@ public class MyBot : IChessBot
                 result
             );
         }
-        
+
         return result;
     }    
 

@@ -150,12 +150,14 @@ public class Tier2 : IChessBot
         for(int depth = 1; depth <= 50; depth++) {
             int score = Search(board, timer, -30000, 30000, depth, 0);
 
+            /*
             System.Console.WriteLine(
                 "T2 depth=" + depth +
                 "; score=" + bestmoveScore +
                 "; time=" + timer.MillisecondsElapsedThisTurn +
                 "; move=" + bestmoveRoot
             );
+            */
 
             // Out of time
             if(timer.MillisecondsElapsedThisTurn >= timer.MillisecondsRemaining / 30)
@@ -164,7 +166,7 @@ public class Tier2 : IChessBot
 
         if (bestmoveRoot.IsNull) bestmoveRoot = board.GetLegalMoves()[0];
         
-        System.Console.WriteLine("T2 committing " + bestmoveRoot + " with a score of " + bestmoveScore);
+        //System.Console.WriteLine("T2 committing " + bestmoveRoot + " with a score of " + bestmoveScore);
         return bestmoveRoot;
     }
 }
