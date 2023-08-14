@@ -466,6 +466,7 @@ namespace ChessChallenge.Application
             {
                 PlayerType.MyBot => new MyBot(),
                 PlayerType.EvilBot => new EvilBot(),
+                PlayerType.Tier2 => new Tier2(),
                 // If you have other bot types, you can add them here as well
                 _ => null
             };

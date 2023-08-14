@@ -67,6 +67,37 @@
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": []
+    },
+    {
+      "label": "CuteChess MyBot vs Tier 2",
+      "type": "shell",
+      "dependsOn": ["build"],
+      "command": "cutechess-cli",
+      "args": [
+        "-engine",
+        "name='MyBot'",
+        "cmd='./Chess-Challenge/bin/Debug/net6.0/Chess-Challenge'",
+        "arg='uci'", "arg='MyBot'",
+        "-engine",
+        "name='Tier2'",
+        "cmd='./Chess-Challenge/bin/Debug/net6.0/Chess-Challenge'",
+        "arg='uci'", "arg='Tier2'",
+        "-each",
+        "proto=uci",
+        "tc=10+0",
+        "-concurrency", "6",
+        "-maxmoves", "200",
+        "-rounds", "250",
+        "-openings", "file='./opening-books/UHO_XXL_+0.80_+1.09.pgn'", "format=pgn"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
     }
   ]
 }
