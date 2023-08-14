@@ -157,8 +157,10 @@ public class MyBot : IChessBot
         this.timer = timer;
         killers = new Move[60,2];
 
-        choice = Move.NullMove;
+        choice = board.GetLegalMoves()[0];
         timeout = timer.MillisecondsRemaining / 30;
+
+        if (timeout < 5) return choice;
 
 #if DEBUG
         choiceScore = -MAX;
@@ -172,7 +174,6 @@ public class MyBot : IChessBot
 #endif
 
             int score = Search(depth++, 0, -MAX, MAX);
-            if (score > MAX/2) break;
 
 #if DEBUG
             Debug(0, 
@@ -189,8 +190,6 @@ public class MyBot : IChessBot
         Debug(0, "MBOT committing " + choice + " with a score of " + choiceScore);
 #endif
 
-        // Debug this issue
-        if (choice.IsNull) choice = board.GetLegalMoves()[0];
         return choice;
     }
 
@@ -232,28 +231,23 @@ public class MyBot : IChessBot
 
         oAlpha = alpha;
 
-        for (int index = 0, pick; index < moves.Length; index++) {
+        for (int index = 0; index < moves.Length; index++) {
             if (timer.MillisecondsElapsedThisTurn > timeout) {
                 return MAX;
             }
 
-            pick = index;
-            for (int j = index; j < moves.Length; j++) {
+            int pick = index, j = index;
+            while (++j < moves.Length) {
                 if (ordering[j] > ordering[pick]) pick = j;
             }
             (ordering[index], ordering[pick], moves[index], moves[pick]) = (ordering[pick], ordering[index], moves[pick], moves[index]);
             Move move = moves[index];
 
             board.MakeMove(move);
-            int score;
-            if (index == 0) {
-                score = -Search(depth - 1, ply + 1, -beta, -alpha);
-            }
-            else {
-                score = -Search(depth - 1, ply + 1, -alpha - 1, -alpha);
-                if (alpha < score && score < beta) 
-                    score = -Search(depth - 1, ply + 1, -beta, -score);
-            }
+            int score = -Search(depth - 1, ply + 1, index == 0 ? -beta : -alpha - 1, -alpha);
+            if (index > 0 && alpha < score && score < beta) 
+                score = -Search(depth - 1, ply + 1, -beta, -score);
+
             board.UndoMove(move);
 
             if (score > result) {
@@ -267,13 +261,7 @@ public class MyBot : IChessBot
 #endif
                 }
 
-                if (score > alpha) {
-                    alpha = score;
-                    if (!move.IsCapture) {
-                        // History heuristic
-                    }
-
-                }
+                alpha = Math.Max(alpha, score);
 
                 if (score >= beta) {
                     if (!move.IsCapture && killers[ply, 0] != move) {
