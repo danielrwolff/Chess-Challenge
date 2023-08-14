@@ -198,14 +198,14 @@ public class MyBot : IChessBot
         nodes++;
 #endif
 
-        bool queisce = depth <= 0, isRoot = ply == 0;
+        bool queisce = depth <= 0, notRoot = ply > 0;
         ulong key = board.ZobristKey;
         int oAlpha, result = -MAX;
 
-        if (!isRoot && board.IsRepeatedPosition()) return 0;
+        if (notRoot && board.IsRepeatedPosition()) return 0;
 
         var ttEntry = tt[key % 0x7FFFFF];
-        if (!isRoot && ttEntry.key == key && ttEntry.depth >= depth && (
+        if (notRoot && ttEntry.key == key && ttEntry.depth >= depth && (
                 ttEntry.flag == 0 
                 || (ttEntry.flag == 1 && ttEntry.score <= alpha) 
                 || (ttEntry.flag == 2 && ttEntry.score >= beta)
@@ -253,7 +253,7 @@ public class MyBot : IChessBot
             if (score > result) {
                 result = score;
                 bestMove = move;
-                if (isRoot) {
+                if (!notRoot) {
                     choice = move;
 #if DEBUG
                     choiceScore = result;
