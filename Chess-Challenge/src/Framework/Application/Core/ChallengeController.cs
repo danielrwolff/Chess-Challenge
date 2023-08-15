@@ -19,6 +19,8 @@ namespace ChessChallenge.Application
         {
             Human,
             MyBot,
+            WolfuhBot,
+            WolfuhMinBot,
             EvilBot,
             Tier1,
             Tier2
@@ -212,6 +214,8 @@ namespace ChessChallenge.Application
             return type switch
             {
                 PlayerType.MyBot => new ChessPlayer(new MyBot(), type, GameDurationMilliseconds),
+                PlayerType.WolfuhBot => new ChessPlayer(new WolfuhBot(), type, GameDurationMilliseconds),
+                PlayerType.WolfuhMinBot => new ChessPlayer(new WolfuhMinBot(), type, GameDurationMilliseconds),
                 PlayerType.EvilBot => new ChessPlayer(new EvilBot(), type, GameDurationMilliseconds),
                 PlayerType.Tier1 => new ChessPlayer(new Tier1(), type, GameDurationMilliseconds),
                 PlayerType.Tier2 => new ChessPlayer(new Tier2(), type, GameDurationMilliseconds),
@@ -465,6 +469,8 @@ namespace ChessChallenge.Application
             return type switch
             {
                 PlayerType.MyBot => new MyBot(),
+                PlayerType.WolfuhBot => new WolfuhBot(),
+                PlayerType.WolfuhMinBot => new WolfuhMinBot(),
                 PlayerType.EvilBot => new EvilBot(),
                 PlayerType.Tier2 => new Tier2(),
                 // If you have other bot types, you can add them here as well

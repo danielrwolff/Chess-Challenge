@@ -175,6 +175,7 @@ public class EvilBot : IChessBot
             if (score > MAX/2) break;
 
 #if DEBUG
+            /*
             Debug(0, 
                 "MBOT depth=" + (depth-1) +
                 "; nodes=" + nodes +
@@ -182,11 +183,12 @@ public class EvilBot : IChessBot
                 "; time=" + timer.MillisecondsElapsedThisTurn +
                 "; " + choice
             );
+            */
 #endif
         }
 
 #if DEBUG
-        Debug(0, "MBOT committing " + choice + " with a score of " + choiceScore);
+        //Debug(0, "MBOT committing " + choice + " with a score of " + choiceScore);
 #endif
 
         // Debug this issue
