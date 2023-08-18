@@ -11,14 +11,13 @@ public class WolfuhMinBot : IChessBot
     */
 
     Move choice;
-    int timeout;
 
     Board board;
     Timer timer;
 
     (Move move, ulong key, int depth, int flag, int score)[] tt = {};
 
-    int MAX = 10000000;
+    int MAX = 10000000, timeout;
 
     public WolfuhMinBot() {
         Array.Resize(ref tt, 0x7FFFFF);
@@ -29,16 +28,20 @@ public class WolfuhMinBot : IChessBot
         this.board = board;
         this.timer = timer;
 
+        // Default to some move, determine our minimum search time.
         choice = board.GetLegalMoves()[0];
         timeout = timer.MillisecondsRemaining / 30;
 
+        // 5ms or less, panic and hope the other bot times out first.
         if (timeout < 5) return choice;
 
+        // Iterative deepening with time constraint.
         int depth = 1;
         while (timer.MillisecondsElapsedThisTurn < timeout && depth <= 30) {
             Search(depth++, 0, -MAX, MAX);
         }
 
+        // Return our best result.
         return choice;
     }
 
@@ -48,8 +51,10 @@ public class WolfuhMinBot : IChessBot
         ulong key = board.ZobristKey;
         int oAlpha, result = -MAX;
 
+        // Handle repeated move draw scenario.
         if (notRoot && board.IsRepeatedPosition()) return 0;
 
+        // Take a look in the transposition table, see if we can return early.
         var ttEntry = tt[key % 0x7FFFFF];
         if (notRoot && ttEntry.key == key && ttEntry.depth >= depth && (
                 ttEntry.flag == 0 
@@ -57,31 +62,46 @@ public class WolfuhMinBot : IChessBot
                 || (ttEntry.flag == 2 && ttEntry.score >= beta)
             )) return ttEntry.score;
 
+        // Otherwise take the transposition entry as our best move, even if it
+        // might not exist.
         Move bestMove = ttEntry.move;
 
+        // Handle Queiscent inside of our search function to save tokens.
         if (queisce) {
-            result = Score();
+            result = Evaluate();
             if (result >= beta) return result;
             alpha = Math.Max(alpha, result);
         }
 
+        // Get moves, captures only if we're in queiscent search and we're not in check.
         Move[] moves = board.GetLegalMoves(queisce && !board.IsInCheck());
-        if (!queisce && moves.Length == 0) return board.IsInCheck() ? -MAX + ply : 0;
 
+        // If we're in regular search and there are no moves, it's a draw if there is no
+        // check and we've lost if there is a check.
+        if (!queisce && moves.Length == 0) return board.IsInCheck() ? ply - MAX : 0;
+
+        // Generate our move ordering weights for our current move selection.
         int[] ordering = Array.ConvertAll(moves, move =>
+            // If our transposition table move is found, weight it the highest.
             (move == bestMove ? MAX : 0) +
+            // If the move is a capture, weight it by the captured piece and then by the
+            // capturing piece.
             (move.IsCapture 
                 ? 1000 * (int)move.CapturePieceType - (int)move.MovePieceType 
                 : 0)
         );
 
+        // Save our original alpha for after we process our moves.
         oAlpha = alpha;
 
         for (int index = 0; index < moves.Length; index++) {
+
+            // If we've reached the time limit, stop now.
             if (timer.MillisecondsElapsedThisTurn > timeout) {
-                return MAX;
+                return MAX; // MAX ensures this path won't be considered.
             }
 
+            // Pick the next best move to evaluate here.
             int pick = index, j = index;
             while (++j < moves.Length) {
                 if (ordering[j] > ordering[pick]) pick = j;
@@ -89,34 +109,42 @@ public class WolfuhMinBot : IChessBot
             (ordering[index], ordering[pick], moves[index], moves[pick]) = (ordering[pick], ordering[index], moves[pick], moves[index]);
             Move move = moves[index];
 
+            // Make the move, search it at the next ply.
             board.MakeMove(move);
             int score = -Search(depth - 1, ply + 1, -beta, -alpha);
             board.UndoMove(move);
 
+            // Update our bests if this move is the best we've seen.
             if (score > result) {
                 result = score;
                 bestMove = move;
+
+                // If we're on the first ply (root), save this best move.
                 if (!notRoot) choice = move;
 
+                // Update alpha, handle beta cutoff.
                 alpha = Math.Max(alpha, score);
                 if (alpha >= beta) break;
             }
         }
 
-        if (!bestMove.IsNull) {
-            tt[key % 0x7FFFFF] = (
-                bestMove,
-                key,
-                depth,
-                result >= beta ? 2 : result > oAlpha ? 0 : 1,
-                result
-            );
-        }
+        // Save our best move in the transposition table.
+        tt[key % 0x7FFFFF] = (
+            bestMove,
+            key,
+            depth,
+            // Determine the flag based on the best result we have. 
+            result >= beta ? 2 : result > oAlpha ? 0 : 1,
+            result
+        );
 
         return result;
     }    
 
-    int Score() {
+    /*
+        Evaluation copy/pasta from Tier 2.
+    */
+    int Evaluate() {
         int mg = 0, eg = 0, phase = 0;
 
         foreach(bool stm in new[] {true, false}) {
