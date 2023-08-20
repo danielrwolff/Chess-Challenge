@@ -20,6 +20,7 @@ namespace ChessChallenge.Application
             Human,
             MyBot,
             WolfuhBot,
+            WolfuhfuhBot,
             WolfuhMinBot,
             EvilBot,
             Tier1,
@@ -470,6 +471,7 @@ namespace ChessChallenge.Application
             {
                 PlayerType.MyBot => new MyBot(),
                 PlayerType.WolfuhBot => new WolfuhBot(),
+                PlayerType.WolfuhfuhBot => new WolfuhfuhBot(),
                 PlayerType.WolfuhMinBot => new WolfuhMinBot(),
                 PlayerType.EvilBot => new EvilBot(),
                 PlayerType.Tier2 => new Tier2(),

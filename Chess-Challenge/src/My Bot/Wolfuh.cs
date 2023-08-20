@@ -1,7 +1,7 @@
-﻿using ChessChallenge.API;
+using ChessChallenge.API;
 using System;
 
-public class MyBot : IChessBot
+public class WolfuhBot : IChessBot
 {
 
     /* TODO
@@ -20,7 +20,7 @@ public class MyBot : IChessBot
 
     int MAX = 10000000, timeout;
 
-    public MyBot() {
+    public WolfuhBot() {
         Array.Resize(ref tt, 0x7FFFFF);
     }
 
