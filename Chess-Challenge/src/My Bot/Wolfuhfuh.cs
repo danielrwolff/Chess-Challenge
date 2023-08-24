@@ -6,8 +6,9 @@ public class WolfuhfuhBot : IChessBot
 
     /* TODO
         - Reverse engineer eval function.
-        - (WolfuhBot) Implement getPstVal into order non-cap moves.
-        - (WolfuhBot) Bring in killer moves and null windows
+        - Decrement depth if depth is >= 4 and no TT hit and not in check.
+        - History heuristics.
+        - Better LMR.
     */
 
     Move choice;
@@ -83,22 +84,26 @@ public class WolfuhfuhBot : IChessBot
         if (!queisce && moves.Length == 0) return board.IsInCheck() ? ply - MAX : 0;
 
         // Generate our move ordering weights for our current move selection.
-        int[] ordering = Array.ConvertAll(moves, move =>
+        int[] ordering = Array.ConvertAll(moves, move => {
             // If our transposition table move is found, weight it the highest.
-            (move == bestMove ? MAX : 0) +
+            if (move == bestMove) return MAX;
+
             // If the move is a capture, weight it by the captured piece and then by the
             // capturing piece.
-            (move.IsCapture 
-                ? 1000 * (int)move.CapturePieceType - (int)move.MovePieceType 
-                : killers[ply, 0] == move || killers[ply, 1] == move 
-                    ? 900 
-                    : 0
-            )
+            if (move.IsCapture) return 10000 * (int)move.CapturePieceType - (int)move.MovePieceType;
+
+            // If the move is a killer move, weight it beneath all capturing moves.
+            if (killers[ply, 0] == move || killers[ply, 1] == move) return 900;
+
+            // Otherwise return the history heuristic for this move.
+            return 0;
+          }
         );
 
         // Save our original alpha for after we process our moves.
         oAlpha = alpha;
 
+        // Loop over our legal moves.
         for (int index = 0; index < moves.Length; index++) {
 
             // If we've reached the time limit, stop now.
@@ -117,10 +122,11 @@ public class WolfuhfuhBot : IChessBot
             // Make the move, search it at the next ply.
             board.MakeMove(move);
             
-            bool isPvNode = index == 0;
+            bool isPvNode = index == 0, isCheck = board.IsInCheck();
             int reduction = queisce ? 1 : Math.Min(
                 depth, 
-                (isPvNode ? 1 : 2) - (board.IsInCheck() ? 1 : 0)
+                (isPvNode ? 1 : 2)
+                - (isCheck ? 1 : 0)
             );
 
             int score = -Search(depth - reduction, ply + 1, isPvNode ? -beta : -alpha - 1, -alpha);
@@ -145,8 +151,8 @@ public class WolfuhfuhBot : IChessBot
                 alpha = Math.Max(alpha, score);
 
                 // Save killer move if applicable.
-                if (score >= beta) {
-                    if (!move.IsCapture && killers[ply, 0] != move) {
+                if (score >= beta && !move.IsCapture) {
+                    if (killers[ply, 0] != move) {
                         killers[ply, 1] = killers[ply, 0];
                         killers[ply, 0] = move;
                     }
