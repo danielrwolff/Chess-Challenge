@@ -102,19 +102,51 @@
       "problemMatcher": []
     },
     {
-      "label": "CuteChess WolfuhBot vs Tier 2",
+      "label": "CuteChess WolfuhfuhBot vs Tier 2",
       "type": "shell",
       "dependsOn": ["build"],
       "command": "cutechess-cli",
       "args": [
         "-engine",
-        "name='WolfuhBot'",
+        "name='WolfuhfuhBot'",
         "cmd='./Chess-Challenge/bin/Debug/net6.0/Chess-Challenge'",
-        "arg='uci'", "arg='WolfuhBot'",
+        "arg='uci'", "arg='WolfuhfuhBot'",
         "-engine",
         "name='Tier2'",
         "cmd='./Chess-Challenge/bin/Debug/net6.0/Chess-Challenge'",
         "arg='uci'", "arg='Tier2'",
+        "-each",
+        "proto=uci",
+        "tc=8+0",
+        "-concurrency", "12",
+        "-maxmoves", "200",
+        "-rounds", "1000",
+        "-sprt", "elo0=0", "elo1=5", "alpha=0.05", "beta=0.05",
+        "-openings", "file='./opening-books/UHO_XXL_+0.80_+1.09.pgn'", "format=pgn"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CuteChess WolfuhfuhBot vs MyBot",
+      "type": "shell",
+      "dependsOn": ["build"],
+      "command": "cutechess-cli",
+      "args": [
+        "-engine",
+        "name='WolfuhfuhBot'",
+        "cmd='./Chess-Challenge/bin/Debug/net6.0/Chess-Challenge'",
+        "arg='uci'", "arg='WolfuhfuhBot'",
+        "-engine",
+        "name='MyBot'",
+        "cmd='./Chess-Challenge/bin/Debug/net6.0/Chess-Challenge'",
+        "arg='uci'", "arg='MyBot'",
         "-each",
         "proto=uci",
         "tc=8+0",
@@ -134,7 +166,7 @@
       "problemMatcher": []
     },
     {
-      "label": "CuteChess WolfuhfuhBot vs WolfuhBot",
+      "label": "CuteChess WolfuhfuhBot vs WolfuhMinBot",
       "type": "shell",
       "dependsOn": ["build"],
       "command": "cutechess-cli",
@@ -144,15 +176,15 @@
         "cmd='./Chess-Challenge/bin/Debug/net6.0/Chess-Challenge'",
         "arg='uci'", "arg='WolfuhfuhBot'",
         "-engine",
-        "name='WolfuhBot'",
+        "name='WolfuhMinBot'",
         "cmd='./Chess-Challenge/bin/Debug/net6.0/Chess-Challenge'",
-        "arg='uci'", "arg='WolfuhBot'",
+        "arg='uci'", "arg='WolfuhMinBot'",
         "-each",
         "proto=uci",
         "tc=8+0",
         "-concurrency", "12",
         "-maxmoves", "200",
-        "-rounds", "500",
+        "-rounds", "1000",
         "-sprt", "elo0=0", "elo1=5", "alpha=0.05", "beta=0.05",
         "-openings", "file='./opening-books/UHO_XXL_+0.80_+1.09.pgn'", "format=pgn"
       ],

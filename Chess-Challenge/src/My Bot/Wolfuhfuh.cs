@@ -50,7 +50,9 @@ public class WolfuhfuhBot : IChessBot
 
     int Search(int depth, int ply, int alpha, int beta) {
 
-        bool queisce = depth <= 0, notRoot = ply > 0;
+        bool queisce = depth <= 0,
+             notRoot = ply > 0, 
+             isPvNode = alpha != beta - 1;
         ulong key = board.ZobristKey;
         int oAlpha, result = -MAX;
 
@@ -92,8 +94,8 @@ public class WolfuhfuhBot : IChessBot
             // capturing piece.
             if (move.IsCapture) return 10000 * (int)move.CapturePieceType - (int)move.MovePieceType;
 
-            // If the move is a killer move, weight it beneath all capturing moves.
-            if (killers[ply, 0] == move || killers[ply, 1] == move) return 900;
+            // If the move is a killer move, weight it beneath all capturing/promoting moves.
+            if (killers[ply, 0] == move || killers[ply, 1] == move) return 9000;
 
             // Otherwise return the history heuristic for this move.
             return 0;
@@ -106,11 +108,6 @@ public class WolfuhfuhBot : IChessBot
         // Loop over our legal moves.
         for (int index = 0; index < moves.Length; index++) {
 
-            // If we've reached the time limit, stop now.
-            if (timer.MillisecondsElapsedThisTurn > timeout) {
-                return MAX; // MAX ensures this path won't be considered.
-            }
-
             // Pick the next best move to evaluate here.
             int pick = index, j = index;
             while (++j < moves.Length) {
@@ -121,23 +118,29 @@ public class WolfuhfuhBot : IChessBot
 
             // Make the move, search it at the next ply.
             board.MakeMove(move);
-            
-            bool isPvNode = index == 0, isCheck = board.IsInCheck();
-            int reduction = queisce ? 1 : Math.Min(
-                depth, 
-                (isPvNode ? 1 : 2)
-                - (isCheck ? 1 : 0)
-            );
 
-            int score = -Search(depth - reduction, ply + 1, isPvNode ? -beta : -alpha - 1, -alpha);
+            int newDepth = board.IsInCheck() ? depth : depth - 1;
+            int reduction = depth <= 2 || queisce
+                ? 0 
+                : Math.Min(
+                    newDepth,
+                    isPvNode ? 0 : 1
+                );
+
+            int score = -Search(newDepth - reduction, ply + 1, isPvNode ? -beta : -alpha - 1, -alpha);
             if (!isPvNode) {
-                if (alpha < score && score < beta && reduction > 1) 
-                    score = -Search(depth - 1, ply + 1, -alpha - 1, -alpha);
+                if (alpha < score && score < beta && reduction > 0) 
+                    score = -Search(newDepth, ply + 1, -alpha - 1, -alpha);
                 if (alpha < score && score < beta) 
-                    score = -Search(depth - 1, ply + 1, -beta, -score);
+                    score = -Search(newDepth, ply + 1, -beta, -score);
             }
             
             board.UndoMove(move);
+
+            // If we've reached the time limit, stop now.
+            if (timer.MillisecondsElapsedThisTurn > timeout) {
+                return MAX; // MAX ensures this path won't be considered.
+            }
 
             // Update our bests if this move is the best we've seen.
             if (score > result) {
@@ -151,7 +154,7 @@ public class WolfuhfuhBot : IChessBot
                 alpha = Math.Max(alpha, score);
 
                 // Save killer move if applicable.
-                if (score >= beta && !move.IsCapture) {
+                if (score >= beta && !move.IsCapture && !move.IsPromotion) {
                     if (killers[ply, 0] != move) {
                         killers[ply, 1] = killers[ply, 0];
                         killers[ply, 0] = move;

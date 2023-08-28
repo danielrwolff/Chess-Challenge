@@ -6,8 +6,9 @@ public class MyBot : IChessBot
 
     /* TODO
         - Reverse engineer eval function.
-        - (WolfuhBot) Implement getPstVal into order non-cap moves.
-        - (WolfuhBot) Bring in killer moves and null windows
+        - Decrement depth if depth is >= 4 and no TT hit and not in check.
+        - History heuristics.
+        - Better LMR.
     */
 
     Move choice;
@@ -49,7 +50,9 @@ public class MyBot : IChessBot
 
     int Search(int depth, int ply, int alpha, int beta) {
 
-        bool queisce = depth <= 0, notRoot = ply > 0;
+        bool queisce = depth <= 0,
+             notRoot = ply > 0, 
+             isPvNode = alpha != beta - 1;
         ulong key = board.ZobristKey;
         int oAlpha, result = -MAX;
 
@@ -83,28 +86,27 @@ public class MyBot : IChessBot
         if (!queisce && moves.Length == 0) return board.IsInCheck() ? ply - MAX : 0;
 
         // Generate our move ordering weights for our current move selection.
-        int[] ordering = Array.ConvertAll(moves, move =>
+        int[] ordering = Array.ConvertAll(moves, move => {
             // If our transposition table move is found, weight it the highest.
-            (move == bestMove ? MAX : 0) +
+            if (move == bestMove) return MAX;
+
             // If the move is a capture, weight it by the captured piece and then by the
             // capturing piece.
-            (move.IsCapture 
-                ? 1000 * (int)move.CapturePieceType - (int)move.MovePieceType 
-                : killers[ply, 0] == move || killers[ply, 1] == move 
-                    ? 900 
-                    : 0
-            )
+            if (move.IsCapture) return 10000 * (int)move.CapturePieceType - (int)move.MovePieceType;
+
+            // If the move is a killer move, weight it beneath all capturing/promoting moves.
+            if (killers[ply, 0] == move || killers[ply, 1] == move) return 9000;
+
+            // Otherwise return the history heuristic for this move.
+            return 0;
+          }
         );
 
         // Save our original alpha for after we process our moves.
         oAlpha = alpha;
 
+        // Loop over our legal moves.
         for (int index = 0; index < moves.Length; index++) {
-
-            // If we've reached the time limit, stop now.
-            if (timer.MillisecondsElapsedThisTurn > timeout) {
-                return MAX; // MAX ensures this path won't be considered.
-            }
 
             // Pick the next best move to evaluate here.
             int pick = index, j = index;
@@ -116,22 +118,29 @@ public class MyBot : IChessBot
 
             // Make the move, search it at the next ply.
             board.MakeMove(move);
-            
-            bool isPvNode = index == 0;
-            int reduction = queisce ? 1 : Math.Min(
-                depth, 
-                (isPvNode ? 1 : 2) - (board.IsInCheck() ? 1 : 0)
-            );
 
-            int score = -Search(depth - reduction, ply + 1, isPvNode ? -beta : -alpha - 1, -alpha);
+            int newDepth = board.IsInCheck() ? depth : depth - 1;
+            int reduction = depth <= 2 || queisce
+                ? 0 
+                : Math.Min(
+                    newDepth,
+                    isPvNode ? 0 : 1
+                );
+
+            int score = -Search(newDepth - reduction, ply + 1, isPvNode ? -beta : -alpha - 1, -alpha);
             if (!isPvNode) {
                 if (alpha < score && score < beta && reduction > 1) 
-                    score = -Search(depth - 1, ply + 1, -alpha - 1, -alpha);
+                    score = -Search(newDepth, ply + 1, -alpha - 1, -alpha);
                 if (alpha < score && score < beta) 
-                    score = -Search(depth - 1, ply + 1, -beta, -score);
+                    score = -Search(newDepth, ply + 1, -beta, -score);
             }
             
             board.UndoMove(move);
+
+            // If we've reached the time limit, stop now.
+            if (timer.MillisecondsElapsedThisTurn > timeout) {
+                return MAX; // MAX ensures this path won't be considered.
+            }
 
             // Update our bests if this move is the best we've seen.
             if (score > result) {
@@ -145,8 +154,8 @@ public class MyBot : IChessBot
                 alpha = Math.Max(alpha, score);
 
                 // Save killer move if applicable.
-                if (score >= beta) {
-                    if (!move.IsCapture && killers[ply, 0] != move) {
+                if (score >= beta && !move.IsCapture && !move.IsPromotion) {
+                    if (killers[ply, 0] != move) {
                         killers[ply, 1] = killers[ply, 0];
                         killers[ply, 0] = move;
                     }
