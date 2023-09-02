@@ -24,7 +24,8 @@ namespace ChessChallenge.Application
             WolfuhMinBot,
             EvilBot,
             Tier1,
-            Tier2
+            Tier2,
+            WindwallV4
         }
 
         // Game state
@@ -220,6 +221,7 @@ namespace ChessChallenge.Application
                 PlayerType.EvilBot => new ChessPlayer(new EvilBot(), type, GameDurationMilliseconds),
                 PlayerType.Tier1 => new ChessPlayer(new Tier1(), type, GameDurationMilliseconds),
                 PlayerType.Tier2 => new ChessPlayer(new Tier2(), type, GameDurationMilliseconds),
+                PlayerType.WindwallV4 => new ChessPlayer(new WindwallV4Bot(), type, GameDurationMilliseconds),
                 _ => new ChessPlayer(new HumanPlayer(boardUI), type)
             };
         }
@@ -475,6 +477,7 @@ namespace ChessChallenge.Application
                 PlayerType.WolfuhMinBot => new WolfuhMinBot(),
                 PlayerType.EvilBot => new EvilBot(),
                 PlayerType.Tier2 => new Tier2(),
+                PlayerType.WindwallV4 => new WindwallV4Bot(),
                 // If you have other bot types, you can add them here as well
                 _ => null
             };
