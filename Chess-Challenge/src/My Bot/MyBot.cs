@@ -1,5 +1,6 @@
 ﻿using ChessChallenge.API;
 using System;
+using static System.Math;
 
 public class MyBot : IChessBot
 {
@@ -40,9 +41,9 @@ public class MyBot : IChessBot
 
         // Iterative deepening with time constraint.
         int depth = 1;
-        while (timer.MillisecondsElapsedThisTurn < timeout && depth <= 30) {
-            Search(depth++, 0, -MAX, MAX);
-        }
+        try {
+            while (depth <= 30) Search(depth++, 0, -MAX, MAX);
+        } catch {}
 
         // Return our best result.
         return choice;
@@ -56,6 +57,9 @@ public class MyBot : IChessBot
         ulong key = board.ZobristKey;
         int oAlpha, result = -MAX;
 
+        // Handle timeout scenario.
+        if (timer.MillisecondsElapsedThisTurn > timeout) ply /= 0;
+
         // Handle repeated move draw scenario.
         if (notRoot && board.IsRepeatedPosition()) return 0;
 
@@ -67,6 +71,9 @@ public class MyBot : IChessBot
                 || (ttEntry.flag == 2 && ttEntry.score >= beta)
             )) return ttEntry.score;
 
+        // Internal iterative reduction.
+        //if (isPvNode && depth >= 4  && ttEntry.move.IsNull) depth--;
+
         // Otherwise take the transposition entry as our best move, even if it
         // might not exist.
         Move bestMove = ttEntry.move;
@@ -75,8 +82,11 @@ public class MyBot : IChessBot
         if (queisce) {
             result = Evaluate();
             if (result >= beta) return result;
-            alpha = Math.Max(alpha, result);
+            alpha = Max(alpha, result);
         }
+
+        // Save our original alpha for after we process our moves.
+        oAlpha = alpha;
 
         // Get moves, captures only if we're in queiscent search and we're not in check.
         Move[] moves = board.GetLegalMoves(queisce && !board.IsInCheck());
@@ -86,61 +96,46 @@ public class MyBot : IChessBot
         if (!queisce && moves.Length == 0) return board.IsInCheck() ? ply - MAX : 0;
 
         // Generate our move ordering weights for our current move selection.
-        int[] ordering = Array.ConvertAll(moves, move => {
-            // If our transposition table move is found, weight it the highest.
-            if (move == bestMove) return MAX;
+        Array.Sort(
+            Array.ConvertAll(moves, move => {
+                // If our transposition table move is found, weight it the highest.
+                if (move == bestMove) return -MAX;
 
-            // If the move is a capture, weight it by the captured piece and then by the
-            // capturing piece.
-            if (move.IsCapture) return 10000 * (int)move.CapturePieceType - (int)move.MovePieceType;
+                // If the move is a capture, weight it by the captured piece and then by the
+                // capturing piece.
+                if (move.IsCapture) return (int)move.MovePieceType - 10000 * (int)move.CapturePieceType;
 
-            // If the move is a killer move, weight it beneath all capturing/promoting moves.
-            if (killers[ply, 0] == move || killers[ply, 1] == move) return 9000;
+                // If the move is a killer move, weight it beneath all capturing/promoting moves.
+                if (killers[ply, 0] == move || killers[ply, 1] == move) return -9000;
 
-            // Otherwise return the history heuristic for this move.
-            return 0;
-          }
+                // Otherwise return the history heuristic for this move.
+                return 0;
+            }),
+            moves
         );
 
-        // Save our original alpha for after we process our moves.
-        oAlpha = alpha;
-
         // Loop over our legal moves.
-        for (int index = 0; index < moves.Length; index++) {
+        foreach (Move move in moves) {
 
-            // Pick the next best move to evaluate here.
-            int pick = index, j = index;
-            while (++j < moves.Length) {
-                if (ordering[j] > ordering[pick]) pick = j;
-            }
-            (ordering[index], ordering[pick], moves[index], moves[pick]) = (ordering[pick], ordering[index], moves[pick], moves[index]);
-            Move move = moves[index];
-
-            // Make the move, search it at the next ply.
             board.MakeMove(move);
 
             int newDepth = board.IsInCheck() ? depth : depth - 1;
             int reduction = depth <= 2 || queisce
                 ? 0 
-                : Math.Min(
+                : Min(
                     newDepth,
                     isPvNode ? 0 : 1
                 );
 
             int score = -Search(newDepth - reduction, ply + 1, isPvNode ? -beta : -alpha - 1, -alpha);
             if (!isPvNode) {
-                if (alpha < score && score < beta && reduction > 1) 
+                if (alpha < score && score < beta && reduction > 0) 
                     score = -Search(newDepth, ply + 1, -alpha - 1, -alpha);
                 if (alpha < score && score < beta) 
                     score = -Search(newDepth, ply + 1, -beta, -score);
             }
-            
+                        
             board.UndoMove(move);
-
-            // If we've reached the time limit, stop now.
-            if (timer.MillisecondsElapsedThisTurn > timeout) {
-                return MAX; // MAX ensures this path won't be considered.
-            }
 
             // Update our bests if this move is the best we've seen.
             if (score > result) {
@@ -151,7 +146,7 @@ public class MyBot : IChessBot
                 if (!notRoot) choice = move;
 
                 // Update alpha with the new score.
-                alpha = Math.Max(alpha, score);
+                alpha = Max(alpha, score);
 
                 // Save killer move if applicable.
                 if (score >= beta && !move.IsCapture && !move.IsPromotion) {
@@ -180,20 +175,19 @@ public class MyBot : IChessBot
     }    
 
     /*
-        Evaluation copy/pasta from Tier 2.
+        Evaluation based on evaluation from Tier 2 and Tyrant.
     */
     int Evaluate() {
-        int mg = 0, eg = 0, phase = 0;
+        int mg = 0, eg = 0, phase = 0, piece, ind;
 
-        foreach(bool stm in new[] {true, false}) {
-            for(var p = PieceType.Pawn; p <= PieceType.King; p++) {
-                int piece = (int)p, ind;
-                ulong mask = board.GetPieceBitboard(p, stm);
+        foreach(int stm in new[] {56, 0}) {
+            for (piece = -1; ++piece < 6;) {
+                ulong mask = board.GetPieceBitboard((PieceType)piece + 1, stm == 56);
                 while(mask != 0) {
-                    phase += phase_incs[piece];
-                    ind = 128 * (piece - 1) + BitboardHelper.ClearAndGetIndexOfLSB(ref mask) ^ (stm ? 56 : 0);
-                    mg += getPstVal(ind) + mg_piece_value[piece];
-                    eg += getPstVal(ind + 64) + eg_piece_value[piece];
+                    phase += 0x00042110 >> piece * 4 & 0x0F;
+                    ind = 128 * piece + BitboardHelper.ClearAndGetIndexOfLSB(ref mask) ^ stm;
+                    mg += getPstVal(ind) + piece_values[piece];
+                    eg += getPstVal(ind + 64) + piece_values[piece + 6];
                 }
             }
 
@@ -201,7 +195,7 @@ public class MyBot : IChessBot
             eg = -eg;
         }
 
-        return (mg * phase + eg * (24 - phase)) / 24 * (board.IsWhiteToMove ? 1 : -1);
+        return (mg * phase + eg * (24 - phase)) / 24 * (board.IsWhiteToMove ? 1 : -1) + phase / 2;
     }
 
     int getPstVal(int psq) {
@@ -209,7 +203,5 @@ public class MyBot : IChessBot
     }
 
     ulong[] psts = {657614902731556116, 420894446315227099, 384592972471695068, 312245244820264086, 364876803783607569, 366006824779723922, 366006826859316500, 786039115310605588, 421220596516513823, 366011295806342421, 366006826859316436, 366006896669578452, 162218943720801556, 440575073001255824, 657087419459913430, 402634039558223453, 347425219986941203, 365698755348489557, 311382605788951956, 147850316371514514, 329107007234708689, 402598430990222677, 402611905376114006, 329415149680141460, 257053881053295759, 291134268204721362, 492947507967247313, 367159395376767958, 384021229732455700, 384307098409076181, 402035762391246293, 328847661003244824, 365712019230110867, 366002427738801364, 384307168185238804, 347996828560606484, 329692156834174227, 365439338182165780, 386018218798040211, 456959123538409047, 347157285952386452, 365711880701965780, 365997890021704981, 221896035722130452, 384289231362147538, 384307167128540502, 366006826859320596, 366006826876093716, 366002360093332756, 366006824694793492, 347992428333053139, 457508666683233428, 329723156783776785, 329401687190893908, 366002356855326100, 366288301819245844, 329978030930875600, 420621693221156179, 422042614449657239, 384602117564867863, 419505151144195476, 366274972473194070, 329406075454444949, 275354286769374224, 366855645423297932, 329991151972070674, 311105941360174354, 256772197720318995, 365993560693875923, 258219435335676691, 383730812414424149, 384601907111998612, 401758895947998613, 420612834953622999, 402607438610388375, 329978099633296596, 67159620133902};
-    int[] mg_piece_value = { 0, 82, 337, 365, 477, 1025, 10000 };
-    int[] eg_piece_value = { 0, 94, 281, 297, 512, 936, 10000 };
-    int[] phase_incs = { 0, 0, 1, 1, 2, 4, 0 };
+    int[] piece_values = { 82, 337, 365, 477, 1025, 10000, 94, 281, 297, 512, 936, 10000 };
 }
