@@ -5,13 +5,6 @@ using static System.Math;
 public class WolfuhfuhBot : IChessBot
 {
 
-    /* TODO
-        - Reverse engineer eval function.
-        - Decrement depth if depth is >= 4 and no TT hit and not in check.
-        - History heuristics.
-        - Better LMR.
-    */
-
     Move choice;
 
     Board board;
@@ -53,9 +46,10 @@ public class WolfuhfuhBot : IChessBot
 
         bool queisce = depth <= 0,
              notRoot = ply > 0, 
-             isPvNode = alpha != beta - 1;
+             isPvNode = alpha != beta - 1,
+             isInCheck = board.IsInCheck();
         ulong key = board.ZobristKey;
-        int oAlpha, result = -MAX;
+        int oAlpha, result = -MAX, moveCount = 0;
 
         // Handle timeout scenario.
         if (timer.MillisecondsElapsedThisTurn > timeout) ply /= 0;
@@ -89,11 +83,11 @@ public class WolfuhfuhBot : IChessBot
         oAlpha = alpha;
 
         // Get moves, captures only if we're in queiscent search and we're not in check.
-        Move[] moves = board.GetLegalMoves(queisce && !board.IsInCheck());
+        Move[] moves = board.GetLegalMoves(queisce && !isInCheck);
 
         // If we're in regular search and there are no moves, it's a draw if there is no
         // check and we've lost if there is a check.
-        if (!queisce && moves.Length == 0) return board.IsInCheck() ? ply - MAX : 0;
+        if (!queisce && moves.Length == 0) return isInCheck ? ply - MAX : 0;
 
         // Generate our move ordering weights for our current move selection.
         Array.Sort(
@@ -118,14 +112,11 @@ public class WolfuhfuhBot : IChessBot
         foreach (Move move in moves) {
 
             board.MakeMove(move);
+            moveCount++;
 
             int newDepth = board.IsInCheck() ? depth : depth - 1;
-            int reduction = depth <= 2 || queisce
-                ? 0 
-                : Min(
-                    newDepth,
-                    isPvNode ? 0 : 1
-                );
+            int reduction = depth <= 2 || queisce || moveCount < 4
+                ? 0 : Min(newDepth, isPvNode ? 1 : 3);
 
             int score = -Search(newDepth - reduction, ply + 1, isPvNode ? -beta : -alpha - 1, -alpha);
             if (!isPvNode) {

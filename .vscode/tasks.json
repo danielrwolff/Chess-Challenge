@@ -149,7 +149,7 @@
         "arg='uci'", "arg='MyBot'",
         "-each",
         "proto=uci",
-        "tc=8+0.08",
+        "tc=60+0",
         "-concurrency", "6",
         "-maxmoves", "200",
         "-rounds", "1000",
