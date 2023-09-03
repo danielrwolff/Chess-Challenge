@@ -19,10 +19,10 @@ public class WolfuhfuhBot : IChessBot
         Array.Resize(ref tt, 0x7FFFFF);
     }
 
-    public Move Think(Board board, Timer timer)
+    public Move Think(Board _board, Timer _timer)
     {
-        this.board = board;
-        this.timer = timer;
+        board = _board;
+        timer = _timer;
         killers = new Move[60,2];
 
         // Default to some move, determine our minimum search time.
@@ -33,9 +33,23 @@ public class WolfuhfuhBot : IChessBot
         if (timeout < 5) return choice;
 
         // Iterative deepening with time constraint.
-        int depth = 1;
+        int depth = 1, alpha = -MAX, beta = MAX;
         try {
-            while (depth <= 30) Search(depth++, 0, -MAX, MAX);
+            while (depth <= 30) {
+                Search(depth++, 0, alpha, beta);
+                /*
+                int score = Search(depth, 0, alpha, beta);
+
+                // TODO: tune these values AFTER all other pruning features?
+                if (score <= alpha) alpha -= 100;
+                else if (score >= beta) beta += 100;
+                else {
+                    depth++;
+                    alpha = score - 25;
+                    beta = score + 25;
+                }
+                */
+            }
         } catch {}
 
         // Return our best result.
@@ -73,7 +87,7 @@ public class WolfuhfuhBot : IChessBot
         Move bestMove = ttEntry.move;
 
         // Handle Queiscent inside of our search function to save tokens.
-        if (queisce) {
+                if (queisce) {
             result = Evaluate();
             if (result >= beta) return result;
             alpha = Max(alpha, result);
@@ -114,9 +128,9 @@ public class WolfuhfuhBot : IChessBot
             board.MakeMove(move);
             moveCount++;
 
-            int newDepth = board.IsInCheck() ? depth : depth - 1;
-            int reduction = depth <= 2 || queisce || moveCount < 4
-                ? 0 : Min(newDepth, isPvNode ? 1 : 3);
+            int newDepth = board.IsInCheck() ? depth : depth - 1,
+                reduction = depth <= 2 || queisce || moveCount < 4
+                    ? 0 : Min(newDepth, isPvNode ? 1 : 3);
 
             int score = -Search(newDepth - reduction, ply + 1, isPvNode ? -beta : -alpha - 1, -alpha);
             if (!isPvNode) {
