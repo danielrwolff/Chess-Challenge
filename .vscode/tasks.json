@@ -134,25 +134,58 @@
       "problemMatcher": []
     },
     {
-      "label": "CuteChess WolfuhfuhBot vs MyBot",
+      "label": "CuteChess MyBot vs WolfuhBot",
       "type": "shell",
       "dependsOn": ["build"],
       "command": "cutechess-cli",
       "args": [
         "-engine",
-        "name='WolfuhfuhBot'",
+        "name='MyBot'",
         "cmd='./Chess-Challenge/bin/Debug/net6.0/Chess-Challenge'",
-        "arg='uci'", "arg='WolfuhfuhBot'",
+        "arg='uci'", "arg='MyBot'",
+        "-engine",
+        "name='WolfuhBot'",
+        "cmd='./Chess-Challenge/bin/Debug/net6.0/Chess-Challenge'",
+        "arg='uci'", "arg='WolfuhBot'",
+        "-each",
+        "proto=uci",
+        "tc=8+0.08",
+        "-concurrency", "6",
+        "-maxmoves", "200",
+        "-rounds", "500",
+        //"-sprt", "elo0=1000", "elo1=5", "alpha=0.05", "beta=0.05",
+        "-openings", "file='./opening-books/UHO_XXL_+0.80_+1.09.pgn'", "format=pgn", "order=random"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CuteChess MyBot vs WolfuhfuhBot",
+      "type": "shell",
+      "dependsOn": ["build"],
+      "command": "cutechess-cli",
+      "args": [
         "-engine",
         "name='MyBot'",
         "cmd='./Chess-Challenge/bin/Debug/net6.0/Chess-Challenge'",
         "arg='uci'", "arg='MyBot'",
+        "-engine",
+        "name='WolfuhfuhBot'",
+        "cmd='./Chess-Challenge/bin/Debug/net6.0/Chess-Challenge'",
+        "arg='uci'", "arg='WolfuhfuhBot'",
         "-each",
         "proto=uci",
         "tc=60+0",
         "-concurrency", "6",
         "-maxmoves", "200",
         "-rounds", "1000",
+        "-ratinginterval", "50",
         //"-sprt", "elo0=1000", "elo1=5", "alpha=0.05", "beta=0.05",
         "-openings", "file='./opening-books/UHO_XXL_+0.80_+1.09.pgn'", "format=pgn", "order=random"
       ],
@@ -187,6 +220,35 @@
         "-rounds", "1000",
         "-sprt", "elo0=0", "elo1=5", "alpha=0.05", "beta=0.05",
         "-openings", "file='./opening-books/UHO_XXL_+0.80_+1.09.pgn'", "format=pgn"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "CuteChess Tourny: MyBot vs Everyone",
+      "type": "shell",
+      "dependsOn": ["build"],
+      "command": "cutechess-cli",
+      "args": [
+        "-engine", "arg='uci'", "name='MyBot'", "arg='MyBot'",
+        "-engine", "arg='uci'", "name='WolfuhMinBot'", "arg='WolfuhMinBot'",
+        "-engine", "arg='uci'", "name='WolfuhBot'", "arg='WolfuhBot'",
+        "-engine", "arg='uci'", "name='WolfuhfuhBot'", "arg='WolfuhfuhBot'",
+        "-engine", "arg='uci'", "name='WindwallV4'", "arg='WindwallV4'",
+        "-each", "tc=8+0.08", "cmd='./Chess-Challenge/bin/Debug/net6.0/Chess-Challenge'", "proto=uci",
+        "-tournament", "gauntlet",
+        "-concurrency", "6",
+        "-maxmoves", "200",
+        "-games", "500",
+        "-ratinginterval", "10",
+        //"-sprt", "elo0=0", "elo1=5", "alpha=0.05", "beta=0.05",
+        "-openings", "file='./opening-books/UHO_XXL_+0.80_+1.09.pgn'", "format=pgn", "order=random"
       ],
       "presentation": {
         "reveal": "always",
