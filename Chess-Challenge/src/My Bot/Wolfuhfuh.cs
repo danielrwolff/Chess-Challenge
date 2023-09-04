@@ -12,6 +12,7 @@ public class WolfuhfuhBot : IChessBot
 
     (Move move, ulong key, int depth, int flag, int score)[] tt = {};
     Move[,] killers;
+    int[,,] history;
 
     int MAX = 10000000, timeout;
 
@@ -24,6 +25,7 @@ public class WolfuhfuhBot : IChessBot
         board = _board;
         timer = _timer;
         killers = new Move[60,2];
+        history = new int[2, 7, 64];
 
         // Default to some move, determine our minimum search time.
         choice = board.GetLegalMoves()[0];
@@ -33,23 +35,9 @@ public class WolfuhfuhBot : IChessBot
         if (timeout < 5) return choice;
 
         // Iterative deepening with time constraint.
-        int depth = 1, alpha = -MAX, beta = MAX;
+        int depth = 1;
         try {
-            while (depth <= 30) {
-                Search(depth++, 0, alpha, beta);
-                /*
-                int score = Search(depth, 0, alpha, beta);
-
-                // TODO: tune these values AFTER all other pruning features?
-                if (score <= alpha) alpha -= 100;
-                else if (score >= beta) beta += 100;
-                else {
-                    depth++;
-                    alpha = score - 25;
-                    beta = score + 25;
-                }
-                */
-            }
+            while (depth <= 30) Search(depth++, 0, -MAX, MAX);
         } catch {}
 
         // Return our best result.
@@ -87,12 +75,12 @@ public class WolfuhfuhBot : IChessBot
         Move bestMove = ttEntry.move;
 
         // Handle Queiscent inside of our search function to save tokens.
-                if (queisce) {
+        if (queisce) {
             result = Evaluate();
             if (result >= beta) return result;
             alpha = Max(alpha, result);
         }
-
+        
         // Save our original alpha for after we process our moves.
         oAlpha = alpha;
 
@@ -107,17 +95,17 @@ public class WolfuhfuhBot : IChessBot
         Array.Sort(
             Array.ConvertAll(moves, move => {
                 // If our transposition table move is found, weight it the highest.
-                if (move == bestMove) return -MAX;
+                if (move == bestMove) return -24_000_000;
 
                 // If the move is a capture, weight it by the captured piece and then by the
                 // capturing piece.
-                if (move.IsCapture) return (int)move.MovePieceType - 10000 * (int)move.CapturePieceType;
+                if (move.IsCapture) return (int)move.MovePieceType - 4_000_000 * (int)move.CapturePieceType;
 
                 // If the move is a killer move, weight it beneath all capturing/promoting moves.
-                if (killers[ply, 0] == move || killers[ply, 1] == move) return -9000;
+                if (killers[ply, 0] == move || killers[ply, 1] == move) return -2_000_000;
 
                 // Otherwise return the history heuristic for this move.
-                return 0;
+                return -history[ply & 1, (int)move.MovePieceType, move.TargetSquare.Index];
             }),
             moves
         );
@@ -145,24 +133,31 @@ public class WolfuhfuhBot : IChessBot
             // Update our bests if this move is the best we've seen.
             if (score > result) {
                 result = score;
-                bestMove = move;
 
-                // If we're on the first ply (root), save this best move.
-                if (!notRoot) choice = move;
+                // Update alpha with the new score, save move if root.
+                if (score > alpha) {
+                    alpha = score;
+                    bestMove = move;
 
-                // Update alpha with the new score.
-                alpha = Max(alpha, score);
-
-                // Save killer move if applicable.
-                if (score >= beta && !move.IsCapture && !move.IsPromotion) {
-                    if (killers[ply, 0] != move) {
-                        killers[ply, 1] = killers[ply, 0];
-                        killers[ply, 0] = move;
-                    }
+                    // If we're on the first ply (root), save this best move.
+                    if (!notRoot) choice = move;
                 }
 
-                // Beta cutoff.
-                if (alpha >= beta) break;
+                // Handle beta cutoff.
+                if (alpha >= beta) {
+
+                    // If the move is quiet, update killers and history heuristic.
+                    if (!move.IsCapture) {
+                        if (killers[ply, 0] != move) {
+                            killers[ply, 1] = killers[ply, 0];
+                            killers[ply, 0] = move;
+                        }
+                        history[ply & 1, (int)move.MovePieceType, move.TargetSquare.Index] += depth * depth;
+                    }
+
+                    // Beta cutoff.
+                    break;
+                }
             }
         }
 

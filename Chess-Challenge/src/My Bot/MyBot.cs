@@ -12,6 +12,7 @@ public class MyBot : IChessBot
 
     (Move move, ulong key, int depth, int flag, int score)[] tt = {};
     Move[,] killers;
+    int[,,] history;
 
     int MAX = 10000000, timeout;
 
@@ -19,11 +20,12 @@ public class MyBot : IChessBot
         Array.Resize(ref tt, 0x7FFFFF);
     }
 
-    public Move Think(Board board, Timer timer)
+    public Move Think(Board _board, Timer _timer)
     {
-        this.board = board;
-        this.timer = timer;
+        board = _board;
+        timer = _timer;
         killers = new Move[60,2];
+        history = new int[2, 7, 64];
 
         // Default to some move, determine our minimum search time.
         choice = board.GetLegalMoves()[0];
@@ -78,7 +80,7 @@ public class MyBot : IChessBot
             if (result >= beta) return result;
             alpha = Max(alpha, result);
         }
-
+        
         // Save our original alpha for after we process our moves.
         oAlpha = alpha;
 
@@ -93,17 +95,17 @@ public class MyBot : IChessBot
         Array.Sort(
             Array.ConvertAll(moves, move => {
                 // If our transposition table move is found, weight it the highest.
-                if (move == bestMove) return -MAX;
+                if (move == bestMove) return -24_000_000;
 
                 // If the move is a capture, weight it by the captured piece and then by the
                 // capturing piece.
-                if (move.IsCapture) return (int)move.MovePieceType - 10000 * (int)move.CapturePieceType;
+                if (move.IsCapture) return (int)move.MovePieceType - 4_000_000 * (int)move.CapturePieceType;
 
                 // If the move is a killer move, weight it beneath all capturing/promoting moves.
-                if (killers[ply, 0] == move || killers[ply, 1] == move) return -9000;
+                if (killers[ply, 0] == move || killers[ply, 1] == move) return -2_000_000;
 
                 // Otherwise return the history heuristic for this move.
-                return 0;
+                return -history[ply & 1, (int)move.MovePieceType, move.TargetSquare.Index];
             }),
             moves
         );
@@ -114,9 +116,9 @@ public class MyBot : IChessBot
             board.MakeMove(move);
             moveCount++;
 
-            int newDepth = board.IsInCheck() ? depth : depth - 1;
-            int reduction = depth <= 2 || queisce || moveCount < 4
-                ? 0 : Min(newDepth, isPvNode ? 1 : 3);
+            int newDepth = board.IsInCheck() ? depth : depth - 1,
+                reduction = depth <= 2 || queisce || moveCount < 4
+                    ? 0 : Min(newDepth, isPvNode ? 1 : 3);
 
             int score = -Search(newDepth - reduction, ply + 1, isPvNode ? -beta : -alpha - 1, -alpha);
             if (!isPvNode) {
@@ -131,24 +133,31 @@ public class MyBot : IChessBot
             // Update our bests if this move is the best we've seen.
             if (score > result) {
                 result = score;
-                bestMove = move;
 
-                // If we're on the first ply (root), save this best move.
-                if (!notRoot) choice = move;
+                // Update alpha with the new score, save move if root.
+                if (score > alpha) {
+                    alpha = score;
+                    bestMove = move;
 
-                // Update alpha with the new score.
-                alpha = Max(alpha, score);
-
-                // Save killer move if applicable.
-                if (score >= beta && !move.IsCapture && !move.IsPromotion) {
-                    if (killers[ply, 0] != move) {
-                        killers[ply, 1] = killers[ply, 0];
-                        killers[ply, 0] = move;
-                    }
+                    // If we're on the first ply (root), save this best move.
+                    if (!notRoot) choice = move;
                 }
 
-                // Beta cutoff.
-                if (alpha >= beta) break;
+                // Handle beta cutoff.
+                if (alpha >= beta) {
+
+                    // If the move is quiet, update killers and history heuristic.
+                    if (!move.IsCapture) {
+                        if (killers[ply, 0] != move) {
+                            killers[ply, 1] = killers[ply, 0];
+                            killers[ply, 0] = move;
+                        }
+                        history[ply & 1, (int)move.MovePieceType, move.TargetSquare.Index] += depth * depth;
+                    }
+
+                    // Beta cutoff.
+                    break;
+                }
             }
         }
 
