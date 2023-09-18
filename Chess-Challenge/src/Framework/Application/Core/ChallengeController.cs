@@ -25,7 +25,8 @@ namespace ChessChallenge.Application
             EvilBot,
             Tier1,
             Tier2,
-            WindwallV4
+            WindwallV4,
+            Tyrant
         }
 
         // Game state
@@ -103,6 +104,7 @@ namespace ChessChallenge.Application
             bool isGameWithHuman = whiteType is PlayerType.Human || blackType is PlayerType.Human;
             int fenIndex = isGameWithHuman ? 0 : botMatchGameIndex / 2;
             board.LoadPosition(botMatchStartFens[fenIndex]);
+            //board.LoadPosition("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 10");
 
             // Player Setup
             PlayerWhite = CreatePlayer(whiteType);
@@ -222,6 +224,7 @@ namespace ChessChallenge.Application
                 PlayerType.Tier1 => new ChessPlayer(new Tier1(), type, GameDurationMilliseconds),
                 PlayerType.Tier2 => new ChessPlayer(new Tier2(), type, GameDurationMilliseconds),
                 PlayerType.WindwallV4 => new ChessPlayer(new WindwallV4Bot(), type, GameDurationMilliseconds),
+                PlayerType.Tyrant => new ChessPlayer(new TyrantBot(), type, GameDurationMilliseconds),
                 _ => new ChessPlayer(new HumanPlayer(boardUI), type)
             };
         }
@@ -478,6 +481,7 @@ namespace ChessChallenge.Application
                 PlayerType.EvilBot => new EvilBot(),
                 PlayerType.Tier2 => new Tier2(),
                 PlayerType.WindwallV4 => new WindwallV4Bot(),
+                PlayerType.Tyrant => new TyrantBot(),
                 // If you have other bot types, you can add them here as well
                 _ => null
             };
