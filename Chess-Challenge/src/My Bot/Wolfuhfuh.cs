@@ -14,7 +14,7 @@ public class WolfuhfuhBot : IChessBot
     Move[,] killers;
     int[,,] history;
 
-    int MAX = 10000000, timeout;
+    int MAX = 10000000, timeout, nodes;
 
     public WolfuhfuhBot() {
         Array.Resize(ref tt, 0x7FFFFF);
@@ -27,6 +27,8 @@ public class WolfuhfuhBot : IChessBot
         killers = new Move[60,2];
         history = new int[2, 7, 64];
 
+        nodes = 0;
+
         // Default to some move, determine our minimum search time.
         choice = board.GetLegalMoves()[0];
         timeout = timer.MillisecondsRemaining / 30;
@@ -35,23 +37,40 @@ public class WolfuhfuhBot : IChessBot
         if (timeout < 5) return choice;
 
         // Iterative deepening with time constraint.
-        int depth = 1;
+        int depth = 1, alpha = -MAX, beta = MAX;
         try {
-            while (depth <= 30) Search(depth++, 0, -MAX, MAX);
+            while (depth <= 30) {
+                Search(depth++, 0, alpha, beta);
+                /*
+                int score = Search(depth, 0, alpha, beta);
+
+                // TODO: tune these values AFTER all other pruning features?
+                if (score <= alpha) alpha -= 100;
+                else if (score >= beta) beta += 100;
+                else {
+                    depth++;
+                    alpha = score - 25;
+                    beta = score + 25;
+                }
+                */
+                //Console.WriteLine("DEPTH = " + (depth-1) + "; nodes = " + nodes + "; Choice " + choice.ToString());
+            }
         } catch {}
 
         // Return our best result.
         return choice;
     }
 
-    int Search(int depth, int ply, int alpha, int beta) {
+    int Search(int depth, int ply, int alpha, int beta, bool canNullMove = true) {
 
-        bool queisce = depth <= 0,
+        bool quiesce = depth <= 0,
              notRoot = ply > 0, 
              isPvNode = alpha != beta - 1,
              isInCheck = board.IsInCheck();
         ulong key = board.ZobristKey;
-        int oAlpha, result = -MAX, moveCount = 0;
+        int oAlpha, result = -MAX, moveCount = 0, score;
+
+        nodes++;
 
         // Handle timeout scenario.
         if (timer.MillisecondsElapsedThisTurn > timeout) ply /= 0;
@@ -74,22 +93,57 @@ public class WolfuhfuhBot : IChessBot
         // might not exist.
         Move bestMove = ttEntry.move;
 
-        // Handle Queiscent inside of our search function to save tokens.
-        if (queisce) {
-            result = Evaluate();
+        // Handle quiescent inside of our search function to save tokens.
+        int eval = Evaluate();
+        if (quiesce) {
+            result = eval;
             if (result >= beta) return result;
             alpha = Max(alpha, result);
         }
-        
+        else if (!isPvNode && !isInCheck) {
+
+            // Reverse futility pruning.
+            //int rfpMargin = 60 * depth;
+            //if (depth <= 4 && eval - rfpMargin >= beta) return eval - rfpMargin;
+            //*/
+
+            // depth <= 6
+            // 60: +8.0  +- 17.6 
+
+            // depth <= 5
+            // 95 - 425429
+            // 85 - 403614 -29.3 +- 36.4
+            // 75 - 388912 -22.3 +- 37.5
+            // 65 -        -9.7  +- 35.7
+            // 60 -        +9.7  +- 18.1
+            // 55 -        -20.9 +- 37.8
+            // 50 -        -9.7  +- 36.1
+            // 45 - 316207 +
+            // 0  - 142633
+
+            // depth <= 4
+            // 60: +11.5 +- 17.6
+
+            /* Null move pruning.
+            if (canNullMove && depth > 1) {
+                board.TrySkipTurn();
+                int nullMoveScore = -Search(depth - 3 - depth / 3, ply + 1, -beta, -alpha, false);
+                board.UndoSkipTurn();
+
+                if (nullMoveScore >= beta) return nullMoveScore;
+            }
+            //*/
+        }
+
         // Save our original alpha for after we process our moves.
         oAlpha = alpha;
 
-        // Get moves, captures only if we're in queiscent search and we're not in check.
-        Move[] moves = board.GetLegalMoves(queisce && !isInCheck);
+        // Get moves, captures only if we're in quiescent search and we're not in check.
+        Move[] moves = board.GetLegalMoves(quiesce && !isInCheck);
 
         // If we're in regular search and there are no moves, it's a draw if there is no
         // check and we've lost if there is a check.
-        if (!queisce && moves.Length == 0) return isInCheck ? ply - MAX : 0;
+        if (!quiesce && moves.Length == 0) return isInCheck ? ply - MAX : 0;
 
         // Generate our move ordering weights for our current move selection.
         Array.Sort(
@@ -117,17 +171,22 @@ public class WolfuhfuhBot : IChessBot
             moveCount++;
 
             int newDepth = board.IsInCheck() ? depth : depth - 1,
-                reduction = depth <= 2 || queisce || moveCount < 4
-                    ? 0 : Min(newDepth, isPvNode ? 1 : 3);
+                reduction = moveCount/8 + (isPvNode ? 0 : 1);
 
-            int score = -Search(newDepth - reduction, ply + 1, isPvNode ? -beta : -alpha - 1, -alpha);
-            if (!isPvNode) {
-                if (alpha < score && score < beta && reduction > 0) 
-                    score = -Search(newDepth, ply + 1, -alpha - 1, -alpha);
-                if (alpha < score && score < beta) 
-                    score = -Search(newDepth, ply + 1, -beta, -score);
-            }
-                        
+            if (
+                // If this is the first move or we're in quiescence, only do a full search.
+                moveCount == 0 || quiesce || 
+                (
+                    // If in the right conditions, try a null window reduced search first.
+                    moveCount < 4 || depth <= 2 ||
+                    (score = -Search(newDepth - reduction, ply + 1, -alpha - 1, -alpha, canNullMove)) > alpha
+                )
+                // If we were above alpha, try a null window search without reduction.
+                && (score = -Search(newDepth, ply + 1, -alpha - 1, -alpha, canNullMove)) > alpha
+            )
+                // If we skipped special searches or achieved a better alpha, try a full search.
+                score = -Search(newDepth, ply + 1, -beta, -alpha, canNullMove);
+
             board.UndoMove(move);
 
             // Update our bests if this move is the best we've seen.
