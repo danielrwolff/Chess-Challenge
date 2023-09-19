@@ -72,6 +72,9 @@ public class MyBot : IChessBot
 
         nodes++;
 
+        int DoSearch(int newDepth, int newAlpha, int reduction = 0, bool canDoNull = true) => 
+            score = -Search(newDepth - reduction, ply + 1, -newAlpha, -alpha, canDoNull);
+
         // Handle timeout scenario.
         if (timer.MillisecondsElapsedThisTurn > timeout) ply /= 0;
 
@@ -179,13 +182,13 @@ public class MyBot : IChessBot
                 (
                     // If in the right conditions, try a null window reduced search first.
                     moveCount < 4 || depth <= 2 ||
-                    (score = -Search(newDepth - reduction, ply + 1, -alpha - 1, -alpha, canNullMove)) > alpha
+                    DoSearch(newDepth, alpha + 1, reduction) > alpha
                 )
                 // If we were above alpha, try a null window search without reduction.
-                && (score = -Search(newDepth, ply + 1, -alpha - 1, -alpha, canNullMove)) > alpha
+                && DoSearch(newDepth, alpha + 1) > alpha
             )
                 // If we skipped special searches or achieved a better alpha, try a full search.
-                score = -Search(newDepth, ply + 1, -beta, -alpha, canNullMove);
+                DoSearch(newDepth, beta);
 
             board.UndoMove(move);
 
