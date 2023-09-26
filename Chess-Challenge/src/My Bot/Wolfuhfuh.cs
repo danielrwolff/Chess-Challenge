@@ -39,22 +39,7 @@ public class WolfuhfuhBot : IChessBot
         // Iterative deepening with time constraint.
         int depth = 1, alpha = -MAX, beta = MAX;
         try {
-            while (depth <= 30) {
-                Search(depth++, 0, alpha, beta);
-                /*
-                int score = Search(depth, 0, alpha, beta);
-
-                // TODO: tune these values AFTER all other pruning features?
-                if (score <= alpha) alpha -= 100;
-                else if (score >= beta) beta += 100;
-                else {
-                    depth++;
-                    alpha = score - 25;
-                    beta = score + 25;
-                }
-                */
-                //Console.WriteLine("DEPTH = " + (depth-1) + "; nodes = " + nodes + "; Choice " + choice.ToString());
-            }
+            while (depth <= 30) Search(depth++, 0, alpha, beta);
         } catch {}
 
         // Return our best result.
@@ -71,6 +56,9 @@ public class WolfuhfuhBot : IChessBot
         int oAlpha, result = -MAX, moveCount = 0, score;
 
         nodes++;
+
+        int DoSearch(int newDepth, int newAlpha, int reduction = 0, bool canDoNull = true) => 
+            score = -Search(newDepth - reduction, ply + 1, -newAlpha, -alpha, canDoNull);
 
         // Handle timeout scenario.
         if (timer.MillisecondsElapsedThisTurn > timeout) ply /= 0;
@@ -103,34 +91,16 @@ public class WolfuhfuhBot : IChessBot
         else if (!isPvNode && !isInCheck) {
 
             // Reverse futility pruning.
-            //int rfpMargin = 60 * depth;
-            //if (depth <= 4 && eval - rfpMargin >= beta) return eval - rfpMargin;
+            if (depth <= 6 && eval - 60 * depth >= beta) return eval;
             //*/
 
-            // depth <= 6
-            // 60: +8.0  +- 17.6 
-
-            // depth <= 5
-            // 95 - 425429
-            // 85 - 403614 -29.3 +- 36.4
-            // 75 - 388912 -22.3 +- 37.5
-            // 65 -        -9.7  +- 35.7
-            // 60 -        +9.7  +- 18.1
-            // 55 -        -20.9 +- 37.8
-            // 50 -        -9.7  +- 36.1
-            // 45 - 316207 +
-            // 0  - 142633
-
-            // depth <= 4
-            // 60: +11.5 +- 17.6
-
-            /* Null move pruning.
-            if (canNullMove && depth > 1) {
+            // Null move pruning.
+            if (canNullMove && eval >= beta && depth > 1) {
                 board.TrySkipTurn();
-                int nullMoveScore = -Search(depth - 3 - depth / 3, ply + 1, -beta, -alpha, false);
+                DoSearch(depth, beta, 4 + depth / 3, false);
                 board.UndoSkipTurn();
 
-                if (nullMoveScore >= beta) return nullMoveScore;
+                if (score >= beta) return score;
             }
             //*/
         }
@@ -179,13 +149,13 @@ public class WolfuhfuhBot : IChessBot
                 (
                     // If in the right conditions, try a null window reduced search first.
                     moveCount < 4 || depth <= 2 ||
-                    (score = -Search(newDepth - reduction, ply + 1, -alpha - 1, -alpha, canNullMove)) > alpha
+                    DoSearch(newDepth, alpha + 1, reduction) > alpha
                 )
                 // If we were above alpha, try a null window search without reduction.
-                && (score = -Search(newDepth, ply + 1, -alpha - 1, -alpha, canNullMove)) > alpha
+                && DoSearch(newDepth, alpha + 1) > alpha
             )
                 // If we skipped special searches or achieved a better alpha, try a full search.
-                score = -Search(newDepth, ply + 1, -beta, -alpha, canNullMove);
+                DoSearch(newDepth, beta);
 
             board.UndoMove(move);
 

@@ -1,8 +1,8 @@
-﻿using ChessChallenge.API;
+using ChessChallenge.API;
 using System;
 using static System.Math;
 
-public class MyBot : IChessBot
+public class WolfuhfuhfuhBot : IChessBot
 {
 
     Move choice;
@@ -16,7 +16,7 @@ public class MyBot : IChessBot
 
     int MAX = 10000000, timeout, nodes;
 
-    public MyBot() {
+    public WolfuhfuhfuhBot() {
         Array.Resize(ref tt, 0x7FFFFF);
     }
 
