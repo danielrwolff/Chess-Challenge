@@ -184,9 +184,9 @@
         "-each",
         "proto=uci",
         "tc=8+0.08",
-        "-concurrency", "6",
+        "-concurrency", "5",
         "-maxmoves", "200",
-        "-rounds", "100",
+        "-rounds", "500",
         "-ratinginterval", "50",
         //"-sprt", "elo0=1000", "elo1=5", "alpha=0.05", "beta=0.05",
         "-openings", "file='./opening-books/UHO_XXL_+0.80_+1.09.pgn'", "format=pgn"//, "order=random"
@@ -216,12 +216,12 @@
         "arg='uci'", "arg='WindwallV4'",
         "-each",
         "proto=uci",
-        "tc=8+0.08",
+        "tc=60+0",
         "-concurrency", "6",
         "-maxmoves", "200",
-        "-rounds", "100",
+        "-rounds", "1000",
         //"-sprt", "elo0=0", "elo1=5", "alpha=0.05", "beta=0.05",
-        "-openings", "file='./opening-books/UHO_XXL_+0.80_+1.09.pgn'", "format=pgn"
+        "-openings", "file='./opening-books/UHO_XXL_+0.80_+1.09.pgn'", "format=pgn", "order=random"
       ],
       "presentation": {
         "reveal": "always",

@@ -10,11 +10,12 @@ public class MyBot : IChessBot
     Board board;
     Timer timer;
 
-    (Move move, ulong key, int depth, int flag, int score)[] tt = {};
+    // move, key, depth, flag, score
+    (Move, ulong, int, int, int)[] tt = {};
     Move[,] killers;
     int[,,] history;
 
-    int MAX = 10000000, timeout, nodes;
+    int MAX = 10000000, timeout;
 
     public MyBot() {
         Array.Resize(ref tt, 0x7FFFFF);
@@ -27,8 +28,6 @@ public class MyBot : IChessBot
         killers = new Move[60,2];
         history = new int[2, 7, 64];
 
-        nodes = 0;
-
         // Default to some move, determine our minimum search time.
         choice = board.GetLegalMoves()[0];
         timeout = timer.MillisecondsRemaining / 30;
@@ -36,14 +35,14 @@ public class MyBot : IChessBot
         // 5ms or less, panic and hope the other bot times out first.
         if (timeout < 5) return choice;
 
-        // Iterative deepening with time constraint.
+        // Iterative deepening with time constraint via try/catch.
         try {
             for (int depth = 1, alpha = -MAX, beta = MAX;;) {
                 int score = Search(depth, 0, alpha, beta);
 
-                // TODO: tune these values AFTER all other pruning features?
-                if (score <= alpha) alpha -= 100;
-                else if (score >= beta) beta += 100;
+                // Aspiration windows.
+                if (score <= alpha) alpha -= 50;
+                else if (score >= beta) beta += 50;
                 else {
                     depth++;
                     alpha = score - 25;
@@ -62,11 +61,10 @@ public class MyBot : IChessBot
         bool quiesce = depth <= 0,
              notRoot = ply > 0, 
              isPvNode = alpha != beta - 1,
-             isInCheck = board.IsInCheck();
+             isInCheck = board.IsInCheck(),
+             canFutilityPrune = false;
         ulong key = board.ZobristKey;
-        int oAlpha, result = -MAX, moveCount = 0, score;
-
-        nodes++;
+        int result = -MAX, moveCount = 0, score, nextFlag = 1;
 
         int DoSearch(int newDepth, int newAlpha, int reduction = 0, bool canDoNull = true) => 
             score = -Search(newDepth - reduction, ply + 1, -newAlpha, -alpha, canDoNull);
@@ -78,19 +76,17 @@ public class MyBot : IChessBot
         if (notRoot && board.IsRepeatedPosition()) return 0;
 
         // Take a look in the transposition table, see if we can return early.
+        // move, key, depth, flag, score
         var ttEntry = tt[key % 0x7FFFFF];
-        if (notRoot && ttEntry.key == key && ttEntry.depth >= depth && (
-                ttEntry.flag == 0 
-                || (ttEntry.flag == 1 && ttEntry.score <= alpha) 
-                || (ttEntry.flag == 2 && ttEntry.score >= beta)
-            )) return ttEntry.score;
-
-        // Internal iterative reduction.
-        //if (isPvNode && depth >= 4  && ttEntry.move.IsNull) depth--;
+        if (notRoot && ttEntry.Item2 == key && ttEntry.Item3 >= depth && (
+                ttEntry.Item4 == 0 
+                || (ttEntry.Item4 == 1 && ttEntry.Item5 <= alpha) 
+                || (ttEntry.Item4 == 2 && ttEntry.Item5 >= beta)
+            )) return ttEntry.Item5;
 
         // Otherwise take the transposition entry as our best move, even if it
         // might not exist.
-        Move bestMove = ttEntry.move;
+        Move bestMove = ttEntry.Item1;
 
         // Handle quiescent inside of our search function to save tokens.
         int eval = Evaluate();
@@ -105,23 +101,6 @@ public class MyBot : IChessBot
             if (depth <= 6 && eval - 60 * depth >= beta) return eval;
             //*/
 
-            // depth <= 6
-            // 60: +8.0  +- 17.6 
-
-            // depth <= 5
-            // 95 - 425429
-            // 85 - 403614 -29.3 +- 36.4
-            // 75 - 388912 -22.3 +- 37.5
-            // 65 -        -9.7  +- 35.7
-            // 60 -        +9.7  +- 18.1
-            // 55 -        -20.9 +- 37.8
-            // 50 -        -9.7  +- 36.1
-            // 45 - 316207 +
-            // 0  - 142633
-
-            // depth <= 4
-            // 60: +11.5 +- 17.6
-
             // Null move pruning.
             if (canNullMove && eval >= beta && depth > 1) {
                 board.TrySkipTurn();
@@ -131,10 +110,10 @@ public class MyBot : IChessBot
                 if (score >= beta) return score;
             }
             //*/
-        }
 
-        // Save our original alpha for after we process our moves.
-        oAlpha = alpha;
+            // Futility pruning condition.
+            canFutilityPrune = depth <= 8 && eval + depth * 130 <= alpha;
+        }
 
         // Get moves, captures only if we're in quiescent search and we're not in check.
         Move[] moves = board.GetLegalMoves(quiesce && !isInCheck);
@@ -164,6 +143,10 @@ public class MyBot : IChessBot
 
         // Loop over our legal moves.
         foreach (Move move in moves) {
+
+            // Do futility pruning if we're really behind and we're evaluating a quiet move.
+            if (canFutilityPrune && !(moveCount == 0 || move.IsCapture || move.IsPromotion))
+                continue;
 
             board.MakeMove(move);
             moveCount++;
@@ -195,6 +178,7 @@ public class MyBot : IChessBot
                 if (score > alpha) {
                     alpha = score;
                     bestMove = move;
+                    nextFlag = 0;
 
                     // If we're on the first ply (root), save this best move.
                     if (!notRoot) choice = move;
@@ -211,6 +195,7 @@ public class MyBot : IChessBot
                         }
                         history[ply & 1, (int)move.MovePieceType, move.TargetSquare.Index] += depth * depth;
                     }
+                    nextFlag = 2;
 
                     // Beta cutoff.
                     break;
@@ -223,8 +208,7 @@ public class MyBot : IChessBot
             bestMove,
             key,
             depth,
-            // Determine the flag based on the best result we have. 
-            result >= beta ? 2 : result > oAlpha ? 0 : 1,
+            nextFlag,
             result
         );
 
