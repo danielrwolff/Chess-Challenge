@@ -1,6 +1,5 @@
 using ChessChallenge.API;
 using System;
-using static System.Math;
 
 public class WolfuhfuhfuhBot : IChessBot
 {
@@ -32,9 +31,6 @@ public class WolfuhfuhfuhBot : IChessBot
         choice = board.GetLegalMoves()[0];
         timeout = timer.MillisecondsRemaining / 30;
 
-        // 5ms or less, panic and hope the other bot times out first.
-        if (timeout < 5) return choice;
-
         // Iterative deepening with time constraint via try/catch.
         try {
             for (int depth = 1, alpha = -MAX, beta = MAX;;) {
@@ -48,7 +44,6 @@ public class WolfuhfuhfuhBot : IChessBot
                     alpha = score - 25;
                     beta = score + 25;
                 }
-                //Console.WriteLine("DEPTH = " + (depth-1) + "; nodes = " + nodes + "; Choice " + choice.ToString());
             }
         } catch {}
 
@@ -70,30 +65,30 @@ public class WolfuhfuhfuhBot : IChessBot
             score = -Search(newDepth - reduction, ply + 1, -newAlpha, -alpha, canDoNull);
 
         // Handle timeout scenario.
-        if (timer.MillisecondsElapsedThisTurn > timeout) ply /= 0;
+        if (timer.MillisecondsElapsedThisTurn > timeout) throw null;
 
         // Handle repeated move draw scenario.
         if (notRoot && board.IsRepeatedPosition()) return 0;
 
         // Take a look in the transposition table, see if we can return early.
         // move, key, depth, flag, score
-        var ttEntry = tt[key % 0x7FFFFF];
-        if (notRoot && ttEntry.Item2 == key && ttEntry.Item3 >= depth && (
-                ttEntry.Item4 == 0 
-                || (ttEntry.Item4 == 1 && ttEntry.Item5 <= alpha) 
-                || (ttEntry.Item4 == 2 && ttEntry.Item5 >= beta)
-            )) return ttEntry.Item5;
+        var (ttMove, ttKey, ttDepth, ttFlag, ttScore) = tt[key % 0x7FFFFF];
+        if (notRoot && ttKey == key && ttDepth >= depth && (
+                ttFlag == 0 
+                || (ttFlag == 1 && ttScore <= alpha) 
+                || (ttFlag == 2 && ttScore >= beta)
+            )) return ttScore;
 
         // Otherwise take the transposition entry as our best move, even if it
         // might not exist.
-        Move bestMove = ttEntry.Item1;
+        Move bestMove = ttMove;
 
         // Handle quiescent inside of our search function to save tokens.
         int eval = Evaluate();
         if (quiesce) {
             result = eval;
             if (result >= beta) return result;
-            alpha = Max(alpha, result);
+            alpha = Math.Max(alpha, result);
         }
         else if (!isPvNode && !isInCheck) {
 
@@ -236,7 +231,7 @@ public class WolfuhfuhfuhBot : IChessBot
             eg = -eg;
         }
 
-        return (mg * phase + eg * (24 - phase)) / 24 * (board.IsWhiteToMove ? 1 : -1) + phase / 2;
+        return (mg * phase + eg * (24 - phase)) / (board.IsWhiteToMove ? 24 : -24) + phase / 2;
     }
 
     int getPstVal(int psq) {

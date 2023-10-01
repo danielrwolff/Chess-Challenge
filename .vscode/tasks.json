@@ -186,7 +186,7 @@
         "tc=8+0.08",
         "-concurrency", "5",
         "-maxmoves", "200",
-        "-rounds", "500",
+        "-rounds", "200",
         "-ratinginterval", "50",
         //"-sprt", "elo0=1000", "elo1=5", "alpha=0.05", "beta=0.05",
         "-openings", "file='./opening-books/UHO_XXL_+0.80_+1.09.pgn'", "format=pgn"//, "order=random"
