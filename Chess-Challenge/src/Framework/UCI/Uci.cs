@@ -55,17 +55,12 @@ namespace ChessChallenge.UCI
                     board.MakeMove(new Chess.Move(move.RawValue), false);
                 }
             }
-
-            string fen = FenUtility.CurrentFen(board);
-            Console.WriteLine(fen);
         }
 
         void GoCommand(string[] args)
         {
-            int wtime = 0, btime = 0;
+            int wtime = 0, btime = 0, mtime = 0;
             API.Board apiBoard = new API.Board(board);
-            Console.WriteLine(FenUtility.CurrentFen(board));
-            Console.WriteLine(apiBoard.GetFenString());
             for (int i = 0; i < args.Length; i++)
             {
                 if (args[i] == "wtime")
@@ -76,14 +71,24 @@ namespace ChessChallenge.UCI
                 {
                     btime = Int32.Parse(args[i + 1]);
                 }
+                else if (args[i] == "movetime") {
+                    mtime = Int32.Parse(args[i + 1]);
+                }
             }
-            if (!apiBoard.IsWhiteToMove)
-            {
-                int tmp = wtime;
-                wtime = btime;
-                btime = tmp;
+            Timer timer;
+
+            if (wtime + btime > 0) {
+                if (!apiBoard.IsWhiteToMove)
+                {
+                    int tmp = wtime;
+                    wtime = btime;
+                    btime = tmp;
+                }
+                timer = new Timer(wtime, btime, 0);
+            } else {
+                timer = new Timer(mtime * 10);
             }
-            Timer timer = new Timer(wtime, btime, 0);
+
             API.Move move = bot.Think(apiBoard, timer);
             Console.WriteLine($"bestmove {move.ToString().Substring(7, move.ToString().Length - 8)}");
         }
@@ -99,8 +104,8 @@ namespace ChessChallenge.UCI
             switch (tokens[0])
             {
                 case "uci":
-                    Console.WriteLine("id name Chess Challenge");
-                    Console.WriteLine("id author AspectOfTheNoob, Sebastian Lague");
+                    Console.WriteLine("id name WolfuhfuhBot");
+                    Console.WriteLine("id author Daniel Wolff");
                     Console.WriteLine("uciok");
                     break;
                 case "ucinewgame":

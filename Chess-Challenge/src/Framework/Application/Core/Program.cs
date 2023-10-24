@@ -16,6 +16,11 @@ namespace ChessChallenge.Application
 
         public static void Main(string[] args)
         {
+
+            StartLiChessBot();
+            return;
+
+            /*
             if (args.Length > 1 && args[0] == "uci")
             {
                 Console.WriteLine("Starting up in UCI mode...");
@@ -63,6 +68,7 @@ namespace ChessChallenge.Application
 
             controller.Release();
             UIHelper.Release();
+            */
         }
 
         public static void SetWindowSize(Vector2 size)
@@ -137,6 +143,19 @@ namespace ChessChallenge.Application
             uci.Run();
         }
       
+        public static void StartLiChessBot() {
+            ChallengeController.PlayerType player = ChallengeController.PlayerType.WolfuhfuhfuhBot;
+
+            IChessBot? bot = ChallengeController.CreateBot(player);
+            if (bot == null)
+            {
+                Console.Error.WriteLine($"Cannot create bot of type {player}");
+                return;
+            }
+
+            UCIBot uci = new UCIBot(bot, player);
+            uci.Run();
+        }
 
     }
 
